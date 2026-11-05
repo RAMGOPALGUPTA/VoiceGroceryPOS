@@ -1,0 +1,16 @@
+sku,name,brand,selling_price,stock_quantity,stock_unit,sale_unit,conversion_to_stock_unit,aliases
+GRO-001,Rice,Local,60.00,25,kg,kg,1,chawal|ਚੌਲ|चावल
+GRO-002,Wheat Flour,Fortune,45.00,30,kg,kg,1,atta|ਆਟਾ|आटा
+GRO-003,Sugar,Local,44.00,20,kg,kg,1,chini|cheeni|ਖੰਡ|चीनी
+GRO-004,Milk,Verka,60.00,40,litre,litre,1,doodh|ਦੁੱਧ|दूध
+GRO-005,Tea,Tata Tea,120.00,10,packet,packet,1,chai patti|ਚਾਹ ਪੱਤੀ|चाय पत्ती
+GRO-006,Toor Dal,Local,130.00,12,kg,kg,1,arhar dal|tuar dal|ਤੂਰ ਦਾਲ|तूर दाल
+GRO-007,Mustard Oil,Farm,150.00,15,litre,litre,1,sarson tel|ਸਰ੍ਹੋਂ ਦਾ ਤੇਲ|सरसों तेल
+GRO-008,Salt,Tata,22.00,25,packet,packet,1,namak|ਨਮਕ|नमक
+GRO-009,Bath Soap,Lux,35.00,30,piece,piece,1,sabun|ਸਾਬਣ|साबुन
+GRO-010,Toothpaste,Colgate,55.00,18,piece,piece,1,manjan|tooth paste|ਮੰਜਨ|मंजन
+GRO-011,Biscuits,Parle-G,10.00,60,packet,packet,1,biscuit|ਬਿਸਕੁਟ|बिस्कੁਟ
+GRO-012,Potato,Local,30.00,35,kg,kg,1,aloo|ਆਲੂ|आलू
+GRO-013,Onion,Local,40.00,28,kg,kg,1,pyaz|pyaaz|ਪਿਆਜ਼|प्याज
+GRO-014,Tomato,Local,35.00,22,kg,kg,1,tamatar|ਟਮਾਟਰ|टमाटर
+GRO-015,Detergent Powder,Ghadi,80.00,14,kg,kg,1,surf|washing powder|ਕੱਪੜੇ ਧੋਣ ਵਾਲਾ ਪਾਊਡਰ|कपड़े धोने वाला पाउडर
