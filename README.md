@@ -331,4 +331,4 @@ Implementation commands and runtime files will be added in M1. Keep frontend/bac
 - [ ] Printer validation
 - [ ] Windows installer
 
-**Next step:** M1 — implement backend foundation, database models/migrations, and a 10–15 product sample inventory. Do not start ASR integration before manual product lookup and billing are reliable.
+**Current implementation:** M1 starter backend, catalog models, initial migration, product endpoints, and a 15-product CSV fixture are now present. The repository changes have not been executed on your laptop yet; run the setup and verification commands in [backend/README.md](backend/README.md). The next step is to verify the environment, migration, seed operation, and API locally. Do not start ASR integration before manual product lookup and billing are reliable.
