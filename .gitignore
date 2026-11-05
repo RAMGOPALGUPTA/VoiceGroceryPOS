@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+backend/.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / Electron
+node_modules/
+frontend/node_modules/
+dist/
+build/
+release/
+out/
+*.log
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Local business data
+*.db
+*.sqlite
+*.sqlite3
+data/
+backups/
+imports/
+exports/
+customer-data/
+
+# Audio
+*.wav
+*.mp3
+*.m4a
+*.flac
+recordings/
+
+# Model weights (managed separately)
+models/asr/
+*.bin
+*.onnx
+*.pt
+*.pth
+*.safetensors
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
