@@ -119,6 +119,8 @@ export default function App() {
     0,
   );
   const itemCount = cart.reduce((sum, line) => sum + line.quantity, 0);
+  const taxTotal = cart.reduce((sum,line) => sum + Number(line.product.selling_price) * line.quantity * Number(line.product.tax_rate || 0) / 100, 0);
+  const amountDue = subtotal + taxTotal;
 
   function add(product: Product) {
     setCart((current) => {
