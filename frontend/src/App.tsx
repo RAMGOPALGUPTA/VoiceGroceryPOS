@@ -60,7 +60,8 @@ export default function App() {
   const [recording, setRecording] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunks = useRef<Blob[]>([]);\n  const [recording, setRecording] = useState(false);\n  const [voiceBusy, setVoiceBusy] = useState(false);\n  const [voiceResult, setVoiceResult] = useState<{transcript:string;items:{product_id:number;name:string;quantity:string;unit:string;selling_price:string;confidence:number}[]}|null>(null);\n  const recorderRef = useRef<MediaRecorder | null>(null);\n  const audioChunks = useRef<Blob[]>([]);
+  const audioChunks = useRef<Blob[]>([]);
+  const [voiceResult, setVoiceResult] = useState<{transcript:string;items:{product_id:number;name:string;quantity:string;unit:string;selling_price:string;confidence:number}[]}|null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All items");
