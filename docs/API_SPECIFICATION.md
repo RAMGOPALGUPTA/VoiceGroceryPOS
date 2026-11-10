@@ -66,3 +66,20 @@ Match score is not ASR confidence and must be calibrated.
 ## Error codes
 
 PRODUCT_NOT_FOUND, PRODUCT_AMBIGUOUS, PRODUCT_INACTIVE, UNIT_INCOMPATIBLE, INSUFFICIENT_STOCK, INVALID_QUANTITY, IMPORT_VALIDATION_FAILED, IDEMPOTENCY_CONFLICT, PRINTER_UNAVAILABLE, ASR_NOT_READY, AUDIO_INVALID.
+
+
+## Implemented catalogue and inventory endpoints
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/v1/products?q=&include_inactive=false` | Search/list products by name, SKU, brand, or barcode |
+| POST | `/api/v1/products` | Create product and record opening stock movement |
+| GET | `/api/v1/products/{id}` | Read product |
+| PATCH | `/api/v1/products/{id}` | Update product fields |
+| DELETE | `/api/v1/products/{id}` | Soft-deactivate product |
+| GET/POST | `/api/v1/categories` | List/create categories |
+| GET/POST | `/api/v1/products/{id}/aliases` | List/add spoken aliases |
+| POST | `/api/v1/inventory/products/{id}/adjustments` | Apply signed stock adjustment with ledger record |
+| GET | `/api/v1/inventory/movements` | List stock movement history |
+
+Stock adjustments reject a resulting negative balance. Product creation records non-zero opening stock in the stock movement ledger. Product deletion is a soft deactivation; historical records are not removed.
