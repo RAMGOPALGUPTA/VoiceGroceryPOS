@@ -324,11 +324,12 @@ Implementation commands and runtime files will be added in M1. Keep frontend/bac
 - [x] Proposed architecture and stack documented
 - [x] Logical database and API contracts documented
 - [x] Pilot plan and acceptance targets documented
-- [ ] Application scaffold
-- [ ] Sample inventory workbook
+- [x] Initial Electron + React application scaffold
+- [x] Product catalogue CRUD/search and stock movement API
+- [ ] Sample inventory workbook and validated Excel import
 - [ ] Manual billing
 - [ ] Offline voice pipeline
 - [ ] Printer validation
 - [ ] Windows installer
 
-**Current implementation:** M1 starter backend, catalog models, initial migration, product endpoints, and a 15-product CSV fixture are now present. The repository changes have not been executed on your laptop yet; run the setup and verification commands in [backend/README.md](backend/README.md). The next step is to verify the environment, migration, seed operation, and API locally. Do not start ASR integration before manual product lookup and billing are reliable.
+**Current implementation:** The repository now contains the M1 backend foundation, initial Electron/React workspace, product catalogue endpoints, category endpoints, aliases, and a stock movement ledger with manual adjustment validation. The implementation has not yet been executed on a Windows machine. Checkout, Excel import, voice processing, printer integration, and installer packaging remain in progress.
