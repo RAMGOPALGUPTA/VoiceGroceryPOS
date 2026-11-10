@@ -1,0 +1,2 @@
+# Optional offline speech recognition. Model files are installed separately; see docs/VOICE_PIPELINE.md.
+faster-whisper>=1.1,<2.0

@@ -1,6 +1,6 @@
 import re
 import unicodedata
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP\nfrom pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
@@ -427,3 +427,30 @@ def reports_summary(db: Session = Depends(get_db)):
         "low_stock_count": sum(1 for p in products if Decimal(p.stock_quantity) <= Decimal(p.reorder_level)),
         "inventory_units": str(sum((Decimal(p.stock_quantity) for p in products), Decimal("0"))),
     }
+
+
+@router.post("/voice/transcribe")
+async def voice_transcribe(file: _UploadFile = _File(...)):
+    suffix = Path(file.filename or "speech.webm").suffix.lower()
+    if suffix not in {".webm", ".wav", ".mp3", ".m4a", ".ogg"}:
+        raise HTTPException(status_code=415, detail="Use WebM, WAV, MP3, M4A or OGG audio")
+    audio = await file.read()
+    if not audio or len(audio) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Audio must be non-empty and at most 20 MB")
+    import tempfile
+    from pathlib import Path
+    from app.services.voice import transcribe_file
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as handle:
+            handle.write(audio); temp_path = handle.name
+        return transcribe_file(temp_path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail="Install backend/requirements-voice.txt to enable offline speech recognition") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Audio transcription failed: {exc}") from exc
+    finally:
+        if temp_path and Path(temp_path).exists():
+            Path(temp_path).unlink(missing_ok=True)
