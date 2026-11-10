@@ -92,9 +92,12 @@ export default function App() {
       );
     }
   }
+  useEffect(() => { void refresh(); }, []);
   useEffect(() => {
-    void refresh();
-  }, []);
+    if (page === "stock") void api.inventory().then(setInventory).catch(e => setError(e.message));
+    if (page === "sales") void api.sales().then(setSales).catch(e => setError(e.message));
+    if (page === "reports") void api.reports().then(setReports).catch(e => setError(e.message));
+  }, [page]);
   const filtered = useMemo(
     () =>
       products.filter((product) => {
