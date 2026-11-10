@@ -6,7 +6,7 @@ if (!(Test-Path $VenvPython)) { throw "Backend virtual environment not found. Cr
 Push-Location $Backend
 try {
     & $VenvPython -m pip install -r requirements-desktop.txt
-    & $VenvPython -m PyInstaller --noconfirm --clean --onefile --name voicegrocery-backend --paths . run_server.py
+    & $VenvPython -m PyInstaller --noconfirm --clean --onefile --name voicegrocery-backend --paths . --hidden-import pandas --hidden-import openpyxl run_server.py
 } finally { Pop-Location }
 if (!(Test-Path (Join-Path $Backend "dist\voicegrocery-backend.exe"))) { throw "PyInstaller did not create the backend executable." }
 Write-Host "Backend executable created: backend\dist\voicegrocery-backend.exe"

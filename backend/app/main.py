@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from app.api.routes import router
 from app.core.config import settings
-from app.database.session import engine
+from app.database.session import engine\nfrom app.database.base import Base
 
 app = FastAPI(title=settings.app_name, version='0.1.0', description='Offline grocery POS backend')
 # The Electron renderer runs on a different local origin in development and
@@ -26,3 +26,10 @@ def health():
     except Exception as exc:
         state = 'unavailable'
     return {'status': 'ok' if state == 'connected' else 'degraded', 'database': state}
+
+
+# On a new packaged installation, create the current metadata schema in the
+# per-user database. Development upgrades should still use Alembic migrations.
+@app.on_event("startup")
+def ensure_local_schema():
+    Base.metadata.create_all(bind=engine)
