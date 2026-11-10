@@ -171,3 +171,146 @@ def list_stock_movements(
     if product_id is not None:
         statement = statement.where(StockMovement.product_id == product_id)
     return db.scalars(statement.order_by(StockMovement.id.desc()).limit(limit)).all()
+
+
+# Inventory spreadsheet import: preview is persisted locally and never changes stock.
+import csv as _csv
+import io as _io
+import json as _json
+import uuid as _uuid
+from datetime import datetime as _datetime
+from decimal import InvalidOperation as _InvalidOperation
+from fastapi import File as _File, UploadFile as _UploadFile
+
+def _import_header(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().casefold()).strip("_")
+
+_IMPORT_COLUMNS = {
+    "sku": {"sku", "item_code", "product_code", "code"},
+    "name": {"name", "product", "product_name", "item", "item_name"},
+    "selling_price": {"selling_price", "sale_price", "price", "mrp", "rate"},
+    "stock_quantity": {"stock_quantity", "quantity", "stock", "opening_stock", "qty"},
+    "brand": {"brand", "manufacturer"}, "barcode": {"barcode", "ean", "upc"},
+    "cost_price": {"cost_price", "purchase_price", "buying_price"},
+    "stock_unit": {"stock_unit", "unit", "uom"}, "sale_unit": {"sale_unit", "selling_unit"},
+    "tax_rate": {"tax_rate", "gst", "gst_rate", "tax"},
+    "reorder_level": {"reorder_level", "minimum_stock", "min_stock"},
+}
+
+def _import_decimal(value, field):
+    if value is None or str(value).strip() == "":
+        return None
+    try:
+        result = Decimal(str(value).replace(",", "").strip())
+    except (_InvalidOperation, ValueError):
+        raise ValueError(f"{field} must be numeric")
+    if not result.is_finite() or result < 0:
+        raise ValueError(f"{field} must be zero or greater")
+    return result
+
+@router.post("/inventory/import/preview")
+async def inventory_import_preview(file: _UploadFile = _File(...), db: Session = Depends(get_db)):
+    filename = file.filename or "inventory.csv"
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Import file must be 10 MB or smaller")
+    suffix = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+    try:
+        if suffix == "csv":
+            raw = list(_csv.DictReader(_io.StringIO(content.decode("utf-8-sig"))))
+        elif suffix in {"xlsx", "xlsm"}:
+            import pandas as pd
+            frame = pd.read_excel(_io.BytesIO(content), dtype=object, engine="openpyxl")
+            raw = frame.where(frame.notna(), None).to_dict(orient="records")
+        else:
+            raise HTTPException(status_code=400, detail="Upload a .csv, .xlsx, or .xlsm file")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="CSV must use UTF-8 encoding") from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not read spreadsheet: {exc}") from exc
+    if not raw:
+        raise HTTPException(status_code=400, detail="The file contains no data rows")
+    mapping = {}
+    for header in raw[0].keys():
+        key = _import_header(header)
+        for field, aliases in _IMPORT_COLUMNS.items():
+            if key in aliases:
+                mapping[field] = header
+    missing = [x for x in ("sku", "name", "selling_price") if x not in mapping]
+    if missing:
+        raise HTTPException(status_code=422, detail=f"Missing required columns: {', '.join(missing)}")
+    rows, seen = [], set()
+    for number, source in enumerate(raw, 2):
+        row = {"row_number": number, "errors": []}
+        for field, header in mapping.items():
+            value = source.get(header)
+            if field in {"selling_price", "stock_quantity", "cost_price", "tax_rate", "reorder_level"}:
+                try:
+                    parsed = _import_decimal(value, field)
+                    row[field] = str(parsed) if parsed is not None else None
+                except ValueError as exc:
+                    row["errors"].append(str(exc))
+            else:
+                row[field] = str(value).strip() if value is not None and str(value).strip() else None
+        if not row.get("sku"): row["errors"].append("sku is required")
+        if not row.get("name"): row["errors"].append("name is required")
+        if row.get("selling_price") is None: row["errors"].append("selling_price is required")
+        key = (row.get("sku") or "").casefold()
+        if key and key in seen: row["errors"].append("duplicate SKU in uploaded file")
+        if key: seen.add(key)
+        existing = db.scalar(select(Product).where(Product.sku == row.get("sku"))) if key else None
+        row["action"] = "update" if existing else "create"
+        row["errors"] = list(dict.fromkeys(row["errors"]))
+        rows.append(row)
+    from app.models.inventory_import import InventoryImport
+    token = str(_uuid.uuid4())
+    valid = sum(not row["errors"] for row in rows)
+    batch = InventoryImport(token=token, filename=filename[:255], status="previewed", row_count=len(rows), valid_count=valid, error_count=len(rows)-valid, rows_json=_json.dumps(rows, ensure_ascii=False))
+    db.add(batch); db.commit()
+    return {"import_id": token, "filename": filename, "row_count": len(rows), "valid_count": valid, "error_count": len(rows)-valid, "columns": mapping, "rows": rows, "stock_modes": ["replace", "add"]}
+
+@router.post("/inventory/import/{import_id}/commit")
+def inventory_import_commit(import_id: str, stock_mode: str = Query(default="replace", pattern="^(replace|add)$"), db: Session = Depends(get_db)):
+    from app.models.inventory_import import InventoryImport
+    batch = db.scalar(select(InventoryImport).where(InventoryImport.token == import_id))
+    if batch is None: raise HTTPException(status_code=404, detail="Import preview not found")
+    if batch.status != "previewed": raise HTTPException(status_code=409, detail="This import has already been committed")
+    rows = _json.loads(batch.rows_json)
+    if any(row["errors"] for row in rows):
+        raise HTTPException(status_code=409, detail="Fix all row errors and upload a corrected file before committing")
+    try:
+        for row in rows:
+            product = db.scalar(select(Product).where(Product.sku == row["sku"]))
+            if product is None:
+                product = Product(sku=row["sku"], name=row["name"], brand=row.get("brand"),
+                    selling_price=Decimal(row["selling_price"]), cost_price=Decimal(row["cost_price"]) if row.get("cost_price") else None,
+                    stock_quantity=Decimal("0"), stock_unit=row.get("stock_unit") or "piece",
+                    sale_unit=row.get("sale_unit") or row.get("stock_unit") or "piece", barcode=row.get("barcode"),
+                    tax_rate=Decimal(row["tax_rate"]) if row.get("tax_rate") else None,
+                    reorder_level=Decimal(row["reorder_level"]) if row.get("reorder_level") else Decimal("0"))
+                db.add(product); db.flush()
+            else:
+                product.name = row["name"]; product.brand = row.get("brand")
+                product.selling_price = Decimal(row["selling_price"])
+                for field in ("cost_price", "tax_rate", "reorder_level"):
+                    if row.get(field) is not None: setattr(product, field, Decimal(row[field]))
+                for field in ("barcode", "stock_unit", "sale_unit"):
+                    if row.get(field): setattr(product, field, row[field])
+            if row.get("stock_quantity") is not None:
+                imported = Decimal(row["stock_quantity"]); before = Decimal(product.stock_quantity)
+                after = imported if stock_mode == "replace" else before + imported
+                delta = after - before
+                if delta:
+                    product.stock_quantity = after
+                    db.add(StockMovement(product_id=product.id, quantity_delta=delta, stock_unit=product.stock_unit,
+                        movement_type="import_replace" if stock_mode == "replace" else "import_add",
+                        reference_type="inventory_import", reference_id=import_id,
+                        note=f"Stock {stock_mode} from {batch.filename}"))
+        batch.status = "committed"; batch.committed_at = _datetime.utcnow()
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Import conflicts with existing data; no rows were committed") from exc
+    return {"import_id": import_id, "status": "committed", "processed_rows": len(rows), "stock_mode": stock_mode}
