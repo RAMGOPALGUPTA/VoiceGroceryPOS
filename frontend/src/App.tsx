@@ -56,7 +56,11 @@ export default function App() {
   const [reports, setReports] = useState<ReportSummary | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"cash"|"upi"|"card"|"other">("cash");
   const [lastSale, setLastSale] = useState<Sale | null>(null);
-  const [checkoutBusy, setCheckoutBusy] = useState(false);\n  const [recording, setRecording] = useState(false);\n  const [voiceBusy, setVoiceBusy] = useState(false);\n  const [voiceResult, setVoiceResult] = useState<{transcript:string;items:{product_id:number;name:string;quantity:string;unit:string;selling_price:string;confidence:number}[]}|null>(null);\n  const recorderRef = useRef<MediaRecorder | null>(null);\n  const audioChunks = useRef<Blob[]>([]);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunks = useRef<Blob[]>([]);\n  const [recording, setRecording] = useState(false);\n  const [voiceBusy, setVoiceBusy] = useState(false);\n  const [voiceResult, setVoiceResult] = useState<{transcript:string;items:{product_id:number;name:string;quantity:string;unit:string;selling_price:string;confidence:number}[]}|null>(null);\n  const recorderRef = useRef<MediaRecorder | null>(null);\n  const audioChunks = useRef<Blob[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All items");
@@ -447,8 +451,27 @@ export default function App() {
       </main>
       <button
         className="voice-button"
-        disabled
-        title="Offline voice billing is under development"
+        disabled={voiceBusy || health !== "Connected"}
+        onClick={async () => {
+          if (recording) { recorderRef.current?.stop(); setRecording(false); return; }
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+            const recorder = new MediaRecorder(stream);
+            recorderRef.current = recorder;
+            audioChunks.current = [];
+            recorder.ondataavailable = event => { if (event.data.size) audioChunks.current.push(event.data); };
+            recorder.onstop = async () => {
+              stream.getTracks().forEach(track => track.stop());
+              setVoiceBusy(true);
+              try { setVoiceResult(await api.transcribe(new Blob(audioChunks.current,{type:recorder.mimeType || "audio/webm"}))); }
+              catch (error) { setError(error instanceof Error ? error.message : "Voice processing failed"); }
+              finally { setVoiceBusy(false); }
+            };
+            recorder.start();
+            setRecording(true);
+          } catch (error) { setError(error instanceof Error ? error.message : "Microphone permission unavailable"); }
+        }}
+        title="Push to talk: click to start, click again to stop"
       >
         <Mic size={18} />
         <span>Voice entry</span>
