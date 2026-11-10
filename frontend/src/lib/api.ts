@@ -30,7 +30,7 @@ export const api = {
   checkout: (payload:{idempotency_key:string;payment_method:"cash"|"upi"|"card"|"other";discount:string;items:{product_id:number;quantity:number}[]}) => request<Sale>('/sales/checkout',{method:'POST',body:JSON.stringify(payload)}),
   sales: () => request<Sale[]>('/sales'),
   inventory: () => request<StockSummary>('/inventory/summary'),
-  reports: () => request<ReportSummary>('/reports/summary'),
+  reports: () => request<ReportSummary>('/reports/summary'),\n  adjustStock: (id:number,delta:string,note:string) => request('/inventory/products/'+id+'/adjustments',{method:'POST',body:JSON.stringify({quantity_delta:delta,note})}),
   createProduct: (product: Omit<Product, 'id' | 'is_active'>) => request<Product>('/products', { method: 'POST', body: JSON.stringify(product) }),
   health: () => fetch('http://127.0.0.1:8000/health').then(r => r.json()) as Promise<{status:string;database:string}>,
 };
