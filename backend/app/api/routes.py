@@ -430,6 +430,12 @@ def reports_summary(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/voice/status")
+def voice_status():
+    from app.services.voice import voice_status as get_voice_status
+    return get_voice_status()
+
+
 @router.post("/voice/transcribe")
 async def voice_transcribe(file: _UploadFile = _File(...)):
     suffix = Path(file.filename or "speech.webm").suffix.lower()
