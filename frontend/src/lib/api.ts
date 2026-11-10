@@ -1,6 +1,6 @@
 export const API_BASE = 'http://127.0.0.1:8000/api/v1';
 
-export type Product = { id: number; sku: string; name: string; brand?: string | null; selling_price: string | number; stock_quantity: string | number; stock_unit: string; sale_unit: string; is_active: boolean };
+export type Product = { id: number; sku: string; name: string; brand?: string | null; selling_price: string | number; stock_quantity: string | number; stock_unit: string; sale_unit: string; reorder_level?: string | number; is_active: boolean };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...init?.headers } });
@@ -26,6 +26,7 @@ export const api = {
   },
   commitImport: (id:string, mode:"replace"|"add") => request<{status:string;processed_rows:number}>(`/inventory/import/${id}/commit?stock_mode=${mode}`, { method:"POST" }),
   products: () => request<Product[]>('/products'),
+  transcribe: async (blob:Blob) => { const form=new FormData(); form.append("file",blob,"voice.webm"); const response=await fetch("http://127.0.0.1:8000/api/v1/voice/transcribe",{method:"POST",body:form}); if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.detail||"Voice transcription failed");} const transcript=await response.json() as {text:string;language:string;language_probability:number}; return request<{transcript:string;items:{product_id:number;name:string;quantity:string;unit:string;selling_price:string;confidence:number;requires_confirmation:boolean}[];unmatched_text:string;confirmation_required:boolean}>("/voice/interpret",{method:"POST",body:JSON.stringify({transcript:transcript.text})}); },
   checkout: (payload:{idempotency_key:string;payment_method:"cash"|"upi"|"card"|"other";discount:string;items:{product_id:number;quantity:number}[]}) => request<Sale>('/sales/checkout',{method:'POST',body:JSON.stringify(payload)}),
   sales: () => request<Sale[]>('/sales'),
   inventory: () => request<StockSummary>('/inventory/summary'),

@@ -1,6 +1,7 @@
 import re
 import unicodedata
-from decimal import Decimal, ROUND_HALF_UP\nfrom pathlib import Path
+from decimal import Decimal, ROUND_HALF_UP
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
@@ -454,3 +455,45 @@ async def voice_transcribe(file: _UploadFile = _File(...)):
     finally:
         if temp_path and Path(temp_path).exists():
             Path(temp_path).unlink(missing_ok=True)
+
+from pydantic import BaseModel, Field
+class VoiceInterpretRequest(BaseModel):
+    transcript: str = Field(min_length=1, max_length=1000)
+
+@router.post("/voice/interpret")
+def voice_interpret(payload: VoiceInterpretRequest, db: Session = Depends(get_db)):
+    from rapidfuzz import fuzz, process
+    import re as _re
+    text = unicodedata.normalize("NFKC", payload.transcript).casefold()
+    products = db.scalars(select(Product).where(Product.is_active.is_(True))).all()
+    aliases = db.scalars(select(ProductAlias)).all()
+    alias_map = {}
+    for product in products:
+        alias_map[normalize_alias(product.name)] = product
+        alias_map[normalize_alias(product.sku)] = product
+        if product.brand:
+            alias_map.setdefault(normalize_alias(product.brand + " " + product.name), product)
+    for alias in aliases:
+        alias_map[normalize_alias(alias.alias)] = next((p for p in products if p.id == alias.product_id), None)
+    alias_map = {k:v for k,v in alias_map.items() if v is not None}
+    number_words = {"one":1,"two":2,"three":3,"four":4,"five":5,"six":6,"seven":7,"eight":8,"nine":9,"ten":10,
+                    "ek":1,"do":2,"teen":3,"char":4,"paanch":5,"che":6,"chhe":6,"saat":7,"aath":8,"nau":9,"das":10,
+                    "एक":1,"दो":2,"तीन":3,"चार":4,"पांच":5,"पाँच":5,"छह":6,"सात":7,"आठ":8,"नौ":9,"दस":10}
+    tokens = list(alias_map.keys())
+    found = []
+    # Longest known alias first; each matched phrase is consumed once.
+    for alias in sorted(tokens, key=len, reverse=True):
+        if alias and alias in text:
+            before = text[:text.index(alias)]
+            qty_match = _re.search(r"([0-9]+(?:\.[0-9]+)?|एक|दो|तीन|चार|पांच|पाँच|छह|सात|आठ|नौ|दस|one|two|three|four|five|six|seven|eight|nine|ten|ek|do|teen|char|paanch|che|chhe|saat|aath|nau|das)\s*$", before)
+            qty = Decimal(qty_match.group(1)) if qty_match and re.match(r"^[0-9]",qty_match.group(1)) else Decimal(number_words.get(qty_match.group(1),1)) if qty_match else Decimal("1")
+            product = alias_map[alias]
+            if not any(x["product_id"] == product.id for x in found):
+                found.append({"product_id":product.id,"name":product.name,"quantity":str(qty),"unit":product.sale_unit,"selling_price":str(product.selling_price),"confidence":0.98,"requires_confirmation":True})
+            text = text.replace(alias, " ", 1)
+    if not found and tokens:
+        candidate = process.extractOne(text.strip(), tokens, scorer=fuzz.WRatio, score_cutoff=72)
+        if candidate:
+            product = alias_map[candidate[0]]
+            found.append({"product_id":product.id,"name":product.name,"quantity":"1","unit":product.sale_unit,"selling_price":str(product.selling_price),"confidence":round(candidate[1]/100,2),"requires_confirmation":True})
+    return {"transcript":payload.transcript,"items":found,"unmatched_text":text.strip(),"confirmation_required":True}

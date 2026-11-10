@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Barcode,
   Boxes,
@@ -56,7 +56,7 @@ export default function App() {
   const [reports, setReports] = useState<ReportSummary | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"cash"|"upi"|"card"|"other">("cash");
   const [lastSale, setLastSale] = useState<Sale | null>(null);
-  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);\n  const [recording, setRecording] = useState(false);\n  const [voiceBusy, setVoiceBusy] = useState(false);\n  const [voiceResult, setVoiceResult] = useState<{transcript:string;items:{product_id:number;name:string;quantity:string;unit:string;selling_price:string;confidence:number}[]}|null>(null);\n  const recorderRef = useRef<MediaRecorder | null>(null);\n  const audioChunks = useRef<Blob[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All items");
@@ -454,6 +454,8 @@ export default function App() {
         <span>Voice entry</span>
         <small>SOON</small>
       </button>
+
+      {voiceResult && <div className="modal-backdrop"><section className="modal receipt-modal"><div className="modal-heading"><div><div className="section-kicker">VOICE DRAFT · REVIEW REQUIRED</div><h3>Confirm spoken items</h3></div><button className="modal-close" onClick={()=>setVoiceResult(null)}><X size={18}/></button></div><p>{voiceResult.transcript || "No speech detected"}</p><div className="receipt-lines">{voiceResult.items.map((item,index)=><div key={index}><span>{item.name} · {item.quantity} {item.unit}</span><b>{money(Number(item.selling_price)*Number(item.quantity))}</b><button className="outline-action" onClick={()=>{const p=products.find(x=>x.id===item.product_id);if(p){setCart(current=>{const found=current.find(line=>line.product.id===p.id);return found?current.map(line=>line.product.id===p.id?{...line,quantity:line.quantity+Number(item.quantity)}:line):[...current,{product:p,quantity:Number(item.quantity)}]});}}}>Add</button></div>)}</div><button className="save-product" onClick={()=>setVoiceResult(null)}>Done reviewing</button></section></div>}
       {showImport && (
         <div
           className="modal-backdrop"
