@@ -2,7 +2,7 @@
 
 Offline-first, voice-assisted grocery billing and inventory management for a single Windows counter.
 
-> **Status:** Active development. Architecture, backend foundation, and an initial React/Electron POS workspace are present. Billing, inventory workflows, voice, printing, packaging, and end-to-end verification are still in progress.
+> **Status:** Active development. Product catalogue, inventory import, sales/payment persistence, checkout API, stock/sales/report screens, and an optional local speech-recognition adapter are implemented. Voice-model installation, thermal printer validation, refund workflow, Windows packaging, and full end-to-end verification remain in progress.
 
 ## Overview
 
@@ -333,3 +333,20 @@ Implementation commands and runtime files will be added in M1. Keep frontend/bac
 - [ ] Windows installer
 
 **Current implementation:** The repository now contains the M1 backend foundation, initial Electron/React workspace, product catalogue endpoints, category endpoints, aliases, and a stock movement ledger with manual adjustment validation. The implementation has not yet been executed on a Windows machine. Checkout, Excel import, voice processing, printer integration, and installer packaging remain in progress.
+
+
+## Implemented operational modules
+
+- Transactional checkout with server-side price/stock validation, idempotency keys, sale snapshots, payment records, and stock ledger deduction.
+- Stock summary, sales history, and operational report summary endpoints and initial desktop screens.
+- Receipt confirmation and system print dialog output (physical thermal printer compatibility is not yet validated).
+- Push-to-talk microphone capture, local transcription API adapter, and cashier-confirmed product suggestions.
+- Optional ASR dependency: install `backend/requirements-voice.txt`, then place a compatible faster-whisper model in `backend/models/faster-whisper-small` (or configure `VOICE_MODEL_PATH`). Model files are not bundled and are never downloaded automatically by the application.
+- Run `alembic upgrade head` after pulling to create the sales/payment tables.
+
+## Current limitations
+
+- Speech transcription requires the optional dependency, local model files, and a working FFmpeg installation for browser-recorded WebM audio. Punjabi/Hindi/English code-switching accuracy must be evaluated with real counter speech before production use.
+- The current speech parser is conservative and requires cashier confirmation; it is not an unattended checkout system.
+- Receipt printing currently uses the Windows/browser print dialog. Direct RP3160 Gold thermal-printer integration and paper-width calibration still require hardware validation.
+- Refunds, split tender, detailed profit reporting, automated backups, and the signed Windows installer remain future implementation work.
