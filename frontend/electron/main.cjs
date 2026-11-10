@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, session } = require('electron');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const http = require('node:http');
@@ -33,7 +33,7 @@ function startBackend() {
     });
   } else {
     const executable = path.join(process.resourcesPath, 'backend', 'voicegrocery-backend.exe');
-    backend = spawn(executable, [], { windowsHide: true, stdio: 'inherit' });
+    const databasePath = path.join(app.getPath('userData'), 'voicegrocery.db').replace(/\\\\/g, '/');\n    backend = spawn(executable, [], { windowsHide: true, stdio: 'inherit', env: { ...process.env, DATABASE_URL: `sqlite:///${databasePath}` } });
   }
   ownsBackend = true;
 }
@@ -64,6 +64,6 @@ async function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {\n  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {\n    callback(permission === 'media' || permission === 'microphone');\n  });\n  return createWindow();\n});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('before-quit', () => { if (ownsBackend && backend && !backend.killed) backend.kill(); });

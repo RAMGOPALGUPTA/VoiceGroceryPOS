@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "electron": "electron .",
     "desktop:dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
-    "desktop:build": "npm run build && electron-builder --win nsis"
+    "desktop:build": "npm run build && electron-builder --win nsis",
+    "desktop:package": "powershell -ExecutionPolicy Bypass -File ../scripts/build-backend.ps1 && npm run build && electron-builder --win nsis"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -27,5 +28,39 @@
     "typescript": "~5.7.2",
     "vite": "^6.0.5",
     "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "in.smartvoice.grocerypos",
+    "productName": "VoiceGroceryPOS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend/dist/voicegrocery-backend.exe",
+        "to": "backend/voicegrocery-backend.exe"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }
