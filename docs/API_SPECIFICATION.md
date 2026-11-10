@@ -91,3 +91,15 @@ Stock adjustments reject a resulting negative balance. Product creation records 
 - Preview persists normalized rows locally and returns row-level validation errors plus create/update classification. Preview does not modify products or stock.
 - `POST /api/v1/inventory/import/{import_id}/commit?stock_mode=replace|add` — commits only a preview with zero row errors. The operation is transactional. `replace` sets the supplied stock quantity; `add` adds it to current stock. Omitted stock quantities leave stock unchanged.
 - Each non-zero stock change writes a stock-ledger movement. Rows missing from the spreadsheet are never deleted or deactivated. An import preview can be committed once.
+
+
+## Sales and payments
+
+- `POST /api/v1/sales/checkout` — accepts an idempotency key, payment method, optional discount and product/quantity lines. The server reloads current product prices and stock, calculates tax, creates the sale and payment records, deducts stock, and writes stock movements in one database transaction. Repeating the same idempotency key returns the existing sale instead of charging/deducting twice.
+- `GET /api/v1/sales` — recent completed/refunded sale records.
+- `GET /api/v1/sales/{sale_id}` — receipt snapshot and line details.
+- `POST /api/v1/sales/{sale_id}/refund` — full-sale refund record only. Restores stock and marks the sale refunded in one transaction. This endpoint records the refund; it does not send money through a bank, UPI provider or card terminal. The cashier must return funds through the original payment channel manually.
+- `GET /api/v1/inventory/summary` — active catalogue and low-stock summary.
+- `GET /api/v1/reports/summary` — daily/all-time sales totals and stock indicators.
+- `POST /api/v1/voice/transcribe` — optional local ASR. Requires the separately installed faster-whisper package and model.
+- `POST /api/v1/voice/interpret` — matches a transcript against names, SKUs, brands and aliases. Suggestions always require cashier confirmation.

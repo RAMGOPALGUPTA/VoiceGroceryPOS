@@ -338,6 +338,7 @@ Implementation commands and runtime files will be added in M1. Keep frontend/bac
 ## Implemented operational modules
 
 - Transactional checkout with server-side price/stock validation, idempotency keys, sale snapshots, payment records, and stock ledger deduction.
+- Full-sale refund recording with idempotency protection and stock restoration; money movement is still performed manually through the payment provider.
 - Stock summary, sales history, and operational report summary endpoints and initial desktop screens.
 - Receipt confirmation and system print dialog output (physical thermal printer compatibility is not yet validated).
 - Push-to-talk microphone capture, local transcription API adapter, and cashier-confirmed product suggestions.
