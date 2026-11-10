@@ -98,6 +98,14 @@ export default function App() {
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
+  const [productAction, setProductAction] = useState<"edit" | "adjust" | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editSellingPrice, setEditSellingPrice] = useState("");
+  const [editCostPrice, setEditCostPrice] = useState("");
+  const [stockDelta, setStockDelta] = useState("");
+  const [stockNote, setStockNote] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
 
   async function refresh() {
     try {
@@ -568,95 +576,25 @@ export default function App() {
             {page === "stock" && inventory && (
               <>
                 <div className="module-stats">
-                  <div>
-                    <small>ACTIVE PRODUCTS</small>
-                    <b>{inventory.product_count}</b>
-                  </div>
-                  <div>
-                    <small>LOW STOCK ITEMS</small>
-                    <b>{inventory.low_stock_count}</b>
-                  </div>
+                  <div><small>ACTIVE PRODUCTS</small><b>{inventory.product_count}</b></div>
+                  <div><small>LOW STOCK ITEMS</small><b>{inventory.low_stock_count}</b></div>
                 </div>
                 <div className="data-table">
-                  <div className="data-head">
-                    <span>PRODUCT</span>
-                    <span>SKU</span>
-                    <span>ON HAND</span>
-                    <span>PRICE</span>
-                    <span>STATUS</span>
+                  <div className="data-head stock-data-head">
+                    <span>PRODUCT</span><span>SKU</span><span>ON HAND</span><span>SELL PRICE</span><span>STATUS</span><span>ACTIONS</span>
                   </div>
                   {inventory.products.map((p) => (
-                    <div className="data-row" key={p.id}>
-                      <b>{p.name}</b>
+                    <div className="data-row stock-data-row" key={p.id}>
+                      <div className="stock-product"><b>{p.name}</b><small>{p.brand || "—"}</small></div>
                       <span>{p.sku}</span>
-                      <span>
-                        {p.stock_quantity} {p.stock_unit}
-                      </span>
+                      <span>{p.stock_quantity} {p.stock_unit}</span>
                       <span>{money(Number(p.selling_price))}</span>
-                      <span>
-                        {Number(p.stock_quantity) <= 0
-                          ? "Out of stock"
-                          : Number(p.stock_quantity) <= Number(p.reorder_level)
-                            ? "Reorder"
-                            : "In stock"}
-                      </span>
-                      <button
-                        className="table-action"
-                        onClick={async () => {
-                          const newName = window.prompt(
-                            "Product name:",
-                            p.name,
-                          );
-                          if (newName === null || !newName.trim()) return;
-                          const newPrice = window.prompt(
-                            "Selling price (₹):",
-                            String(p.selling_price),
-                          );
-                          if (newPrice === null || !newPrice.trim()) return;
-                          try {
-                            await api.updateProduct(p.id, {
-                              name: newName.trim(),
-                              selling_price: newPrice,
-                            });
-                            setInventory(await api.inventory());
-                            await refresh();
-                          } catch (e) {
-                            setError(
-                              e instanceof Error
-                                ? e.message
-                                : "Product update failed",
-                            );
-                          }
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="table-action"
-                        onClick={async () => {
-                          const value = window.prompt(
-                            "Enter stock change (use a negative number to remove stock):",
-                          );
-                          if (value === null || !value.trim()) return;
-                          try {
-                            await api.adjustStock(
-                              p.id,
-                              value,
-                              "Manual adjustment from Stock screen",
-                            );
-                            setInventory(await api.inventory());
-                            await refresh();
-                          } catch (e) {
-                            setError(
-                              e instanceof Error
-                                ? e.message
-                                : "Stock adjustment failed",
-                            );
-                          }
-                        }}
-                      >
-                        Adjust
-                      </button>
+                      <span className={Number(p.stock_quantity) <= 0 ? "stock-status out" : Number(p.stock_quantity) <= Number(p.reorder_level) ? "stock-status low" : "stock-status"}>{Number(p.stock_quantity) <= 0 ? "Out of stock" : Number(p.stock_quantity) <= Number(p.reorder_level) ? "Low stock" : "In stock"}</span>
+                      <div className="stock-actions">
+                        <button className="table-action" onClick={() => { setSelectedProduct(p); setEditName(p.name); setEditSellingPrice(String(p.selling_price)); setEditCostPrice(p.cost_price == null ? "" : String(p.cost_price)); setProductAction("edit"); }}>Edit</button>
+                        <button className="table-action" onClick={() => { setSelectedProduct(p); setStockDelta(""); setStockNote("Manual stock adjustment"); setProductAction("adjust"); }}>Adjust</button>
+                        <button className="table-action danger-action" onClick={async () => { if (!window.confirm("Deactivate " + p.name + "? It will no longer appear in checkout, but existing sales history will be retained.")) return; try { await api.deactivateProduct(p.id); setInventory(await api.inventory()); await refresh(); } catch (e) { setError(e instanceof Error ? e.message : "Could not deactivate product"); } }}>Delete</button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -972,7 +910,58 @@ export default function App() {
           </section>
         </div>
       )}
-      {showImport && (
+      {productAction && selectedProduct && (
+        <div className="modal-backdrop" onClick={() => !actionBusy && setProductAction(null)}>
+          <form className="modal product-action-modal" onSubmit={async (event) => {
+            event.preventDefault();
+            setActionBusy(true);
+            try {
+              if (productAction === "edit") {
+                const selling = Number(editSellingPrice);
+                const cost = editCostPrice.trim() === "" ? null : Number(editCostPrice);
+                if (!editName.trim() || !Number.isFinite(selling) || selling < 0 || (cost !== null && (!Number.isFinite(cost) || cost < 0))) throw new Error("Enter a valid product name and non-negative prices.");
+                await api.updateProduct(selectedProduct.id, { name: editName.trim(), selling_price: editSellingPrice, cost_price: cost });
+              } else {
+                const delta = Number(stockDelta);
+                if (!Number.isFinite(delta) || delta === 0) throw new Error("Enter a non-zero stock change.");
+                await api.adjustStock(selectedProduct.id, stockDelta, stockNote.trim() || "Manual stock adjustment");
+              }
+              setProductAction(null);
+              setSelectedProduct(null);
+              setInventory(await api.inventory());
+              await refresh();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Inventory action failed");
+            } finally { setActionBusy(false); }
+          }} onClick={(event) => event.stopPropagation()}>
+            <div className="modal-heading">
+              <div><div className="section-kicker">INVENTORY CONTROL · {productAction === "edit" ? "EDIT PRODUCT" : "ADJUST STOCK"}</div><h3>{selectedProduct.name}</h3></div>
+              <button type="button" className="modal-close" onClick={() => setProductAction(null)} disabled={actionBusy}><X size={18}/></button>
+            </div>
+            {productAction === "edit" ? (
+              <>
+                <label>Product name<input required value={editName} onChange={e => setEditName(e.target.value)} /></label>
+                <div className="form-grid">
+                  <label>Selling price (₹)<input required type="number" min="0" step="0.01" value={editSellingPrice} onChange={e => setEditSellingPrice(e.target.value)} /></label>
+                  <label>Cost / purchase price (₹)<input type="number" min="0" step="0.01" value={editCostPrice} onChange={e => setEditCostPrice(e.target.value)} placeholder="Enter buying cost" /></label>
+                </div>
+                <p className="form-hint">Cost price is used to calculate gross profit in reports.</p>
+              </>
+            ) : (
+              <>
+                <p className="form-hint">Current stock: <b>{selectedProduct.stock_quantity} {selectedProduct.stock_unit}</b>. Use a positive number to add stock and a negative number to remove stock.</p>
+                <label>Quantity change<input required type="number" step="0.001" value={stockDelta} onChange={e => setStockDelta(e.target.value)} placeholder="e.g. 10 or -2" /></label>
+                <label>Reason<input required value={stockNote} onChange={e => setStockNote(e.target.value)} placeholder="Purchase, damaged, correction…" /></label>
+              </>
+            )}
+            <div className="import-actions">
+              <button type="button" className="outline-action" onClick={() => setProductAction(null)} disabled={actionBusy}>Cancel</button>
+              <button className="save-product" type="submit" disabled={actionBusy}>{actionBusy ? "Saving…" : productAction === "edit" ? "Save changes" : "Apply adjustment"}</button>
+            </div>
+          </form>
+        </div>
+      )}
+            {showImport && (
         <div
           className="modal-backdrop"
           onClick={() => {
