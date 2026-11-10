@@ -7,7 +7,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.database.session import get_db
-from app.models import Category, Product, ProductAlias, StockMovement, Sale, SaleItem, Payment
+from app.models import Category, Product, ProductAlias, StockMovement, Sale, SaleItem, Payment, Refund
 from app.schemas.category import CategoryCreate, CategoryRead
 from app.schemas.sale import CheckoutRequest, SaleRead
 from app.schemas.product import (
@@ -498,3 +498,42 @@ def voice_interpret(payload: VoiceInterpretRequest, db: Session = Depends(get_db
             product = alias_map[candidate[0]]
             found.append({"product_id":product.id,"name":product.name,"quantity":"1","unit":product.sale_unit,"selling_price":str(product.selling_price),"confidence":round(candidate[1]/100,2),"requires_confirmation":True})
     return {"transcript":payload.transcript,"items":found,"unmatched_text":text.strip(),"confirmation_required":True}
+
+from pydantic import BaseModel, Field
+class RefundRequest(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=80)
+    reason: str = Field(min_length=3, max_length=300)
+    method: str = Field(default="cash", pattern="^(cash|upi|card|other)$")
+
+@router.post("/sales/{sale_id}/refund")
+def refund_sale(sale_id: int, payload: RefundRequest, db: Session = Depends(get_db)):
+    existing = db.scalar(select(Refund).where(Refund.idempotency_key == payload.idempotency_key))
+    if existing is not None:
+        return {"refund_id":existing.id,"sale_id":existing.sale_id,"amount":str(existing.amount),"status":"refunded"}
+    sale = db.scalar(select(Sale).where(Sale.id == sale_id).with_for_update())
+    if sale is None:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    if sale.status != "completed":
+        raise HTTPException(status_code=409, detail="Only completed sales can be refunded")
+    try:
+        for item in sale.items:
+            product = db.scalar(select(Product).where(Product.id == item.product_id).with_for_update())
+            if product is None:
+                raise HTTPException(status_code=409, detail=f"Product {item.name_snapshot} no longer exists")
+            restored = Decimal(item.quantity) * Decimal(product.conversion_to_stock_unit)
+            product.stock_quantity = Decimal(product.stock_quantity) + restored
+            db.add(StockMovement(product_id=product.id,quantity_delta=restored,stock_unit=product.stock_unit,
+                movement_type="refund",reference_type="sale",reference_id=str(sale.id),
+                note=f"Stock restored for refund {sale.receipt_number}"))
+        refund = Refund(sale_id=sale.id,idempotency_key=payload.idempotency_key,
+            amount=sale.grand_total,reason=payload.reason.strip(),method=payload.method)
+        db.add(refund)
+        sale.status = "refunded"
+        db.commit()
+        return {"refund_id":refund.id,"sale_id":sale.id,"amount":str(refund.amount),"status":"refunded"}
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Refund was already processed or conflicted") from exc
