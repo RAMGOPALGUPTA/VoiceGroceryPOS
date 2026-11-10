@@ -59,6 +59,7 @@ export default function App() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [recording, setRecording] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
+  const [voiceReady, setVoiceReady] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
   const [voiceResult, setVoiceResult] = useState<{transcript:string;items:{product_id:number;name:string;quantity:string;unit:string;selling_price:string;confidence:number}[]}|null>(null);
@@ -79,12 +80,14 @@ export default function App() {
 
   async function refresh() {
     try {
-      const result = await Promise.all([api.products(), api.health()]);
+      const result = await Promise.all([api.products(), api.health(), api.voiceStatus()]);
       setProducts(result[0]);
       setHealth(result[1].database === "connected" ? "Connected" : "Degraded");
+      setVoiceReady(result[2].enabled);
       setError("");
     } catch (e) {
       setHealth("Offline");
+      setVoiceReady(false);
       setError(
         e instanceof Error
           ? e.message
@@ -456,32 +459,67 @@ export default function App() {
         </footer>
       </main>
       <button
-        className="voice-button"
+        className={"voice-button" + (recording ? " is-recording" : "") + (voiceBusy ? " is-processing" : "")}
         disabled={voiceBusy || health !== "Connected"}
         onClick={async () => {
-          if (recording) { recorderRef.current?.stop(); setRecording(false); return; }
+          if (recording) {
+            recorderRef.current?.stop();
+            setRecording(false);
+            return;
+          }
           try {
-            const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-            const recorder = new MediaRecorder(stream);
+            setError("");
+            if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+              throw new Error("This desktop runtime does not support microphone recording. Restart the Electron app and check microphone permissions.");
+            }
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+            });
+            const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+              ? "audio/webm;codecs=opus"
+              : "audio/webm";
+            const recorder = new MediaRecorder(stream, { mimeType });
             recorderRef.current = recorder;
             audioChunks.current = [];
-            recorder.ondataavailable = event => { if (event.data.size) audioChunks.current.push(event.data); };
+            recorder.ondataavailable = event => {
+              if (event.data.size > 0) audioChunks.current.push(event.data);
+            };
+            recorder.onerror = () => {
+              stream.getTracks().forEach(track => track.stop());
+              setRecording(false);
+              setError("Microphone recording failed. Check that no other application is using the microphone.");
+            };
             recorder.onstop = async () => {
               stream.getTracks().forEach(track => track.stop());
+              setRecording(false);
+              const audio = new Blob(audioChunks.current, { type: recorder.mimeType || "audio/webm" });
+              if (!audio.size) {
+                setError("No audio was captured. Hold the microphone button while speaking, then release it.");
+                return;
+              }
               setVoiceBusy(true);
-              try { setVoiceResult(await api.transcribe(new Blob(audioChunks.current,{type:recorder.mimeType || "audio/webm"}))); }
-              catch (error) { setError(error instanceof Error ? error.message : "Voice processing failed"); }
-              finally { setVoiceBusy(false); }
+              try {
+                const result = await api.transcribe(audio);
+                setVoiceResult(result);
+                if (!result.transcript.trim()) setError("No speech was detected. Try speaking closer to the microphone.");
+              } catch (error) {
+                setError(error instanceof Error ? error.message : "Voice processing failed");
+              } finally {
+                setVoiceBusy(false);
+              }
             };
             recorder.start();
             setRecording(true);
-          } catch (error) { setError(error instanceof Error ? error.message : "Microphone permission unavailable"); }
+          } catch (error) {
+            setError(error instanceof Error ? error.message : "Microphone permission unavailable");
+          }
         }}
-        title="Push to talk: click to start, click again to stop"
+        title={recording ? "Click to stop recording" : "Click to start recording, speak, then click again to transcribe"}
+        aria-label={recording ? "Stop voice recording" : "Start voice recording"}
       >
         <Mic size={18} />
-        <span>Voice entry</span>
-        <small>SOON</small>
+        <span>{recording ? "Stop recording" : voiceBusy ? "Transcribing…" : "Voice entry"}</span>
+        <small>{recording ? "LIVE" : voiceBusy ? "WAIT" : voiceReady ? "LOCAL" : "SETUP"}</small>
       </button>
 
 
