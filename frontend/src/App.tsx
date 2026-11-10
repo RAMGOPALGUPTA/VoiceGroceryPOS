@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Barcode, Boxes, ChartNoAxesCombined, CircleAlert, ClipboardList, CloudOff, Mic, PackagePlus, Plus, Search, ShoppingCart, Store, Trash2, X, Minus, ReceiptText, CircleHelp, Command } from "lucide-react";
-import { api, type Product } from "./lib/api";
+import { api, type Product, type ImportPreview } from "./lib/api";
 
 type CartLine = { product: Product; quantity: number };
 const categories = ["All items", "Staples", "Dairy", "Snacks", "Beverages", "Personal care", "Household"];
@@ -22,7 +22,7 @@ export default function App() {
   const [category, setCategory] = useState("All items");
   const [health, setHealth] = useState("Checking");
   const [error, setError] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);\n  const [showImport, setShowImport] = useState(false);\n  const [preview, setPreview] = useState<ImportPreview | null>(null);\n  const [stockMode, setStockMode] = useState<"replace" | "add">("replace");\n  const [importBusy, setImportBusy] = useState(false);
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState("");
@@ -87,7 +87,7 @@ export default function App() {
       {error && <div className="error-strip"><CircleAlert size={15}/>{error}<button onClick={() => void refresh()}>Try again</button></div>}
       <div className="pos-layout">
         <section className="browse-area">
-          <div className="section-heading"><div><div className="section-kicker">PRODUCTS</div><h2>What are we selling?</h2></div><button className="outline-action" onClick={() => setShowAdd(true)}><PackagePlus size={16}/> New item</button></div>
+          <div className="section-heading"><div><div className="section-kicker">PRODUCTS</div><h2>What are we selling?</h2></div><div className="heading-actions"><button className="outline-action" onClick={() => { setPreview(null); setShowImport(true); }}><Boxes size={15}/> Import sheet</button><button className="outline-action" onClick={() => setShowAdd(true)}><PackagePlus size={16}/> New item</button></div></div>
           <div className="search-row"><Search size={18}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Scan barcode or search product name…"/><kbd><Command size={11}/> K</kbd></div>
           <div className="category-strip">{categories.map((item) => <button key={item} className={category === item ? "category-tab active" : "category-tab"} onClick={() => setCategory(item)}>{item}</button>)}</div>
           <div className="catalog-meta"><span>{filtered.length} ITEMS FOUND</span><span>SELECT AN ITEM TO ADD TO BILL</span></div>
@@ -118,6 +118,11 @@ export default function App() {
       <footer className="work-footer"><div><span className="footer-live"/> LOCAL MODE <span className="footer-divider">/</span> INVENTORY SYNCED FROM THIS DEVICE</div><div>SMARTVOICE POS <b>0.1.0</b></div></footer>
     </main>
     <button className="voice-button" disabled title="Offline voice billing is under development"><Mic size={18}/><span>Voice entry</span><small>SOON</small></button>
+    {showImport && <div className="modal-backdrop" onClick={() => { if (!importBusy) setShowImport(false); }}><section className="modal import-modal" onClick={(event) => event.stopPropagation()}>
+      <div className="modal-heading"><div><div className="section-kicker">STOCK MANAGEMENT</div><h3>Import inventory</h3></div><button className="modal-close" onClick={() => setShowImport(false)} disabled={importBusy}><X size={18}/></button></div>
+      {!preview ? <div className="upload-area"><Boxes size={25}/><b>Choose your stock spreadsheet</b><span>CSV or Excel (.xlsx). Up to 10 MB.</span><label className="file-pick">Choose file<input type="file" accept=".csv,.xlsx,.xlsm" onChange={async (event) => { const file=event.target.files?.[0]; if (!file) return; setImportBusy(true); try { setPreview(await api.previewImport(file)); setError(""); } catch(e) { setError(e instanceof Error ? e.message : "Import preview failed"); } finally { setImportBusy(false); event.target.value=""; } }} /></label><small>Required columns: SKU, product name, selling price.</small></div> :
+      <><div className="import-summary"><b>{preview.filename}</b><span>{preview.row_count} rows · {preview.valid_count} valid · {preview.error_count} errors</span></div><label className="mode-label">How should stock quantities be applied?<select value={stockMode} onChange={(event) => setStockMode(event.target.value as "replace"|"add")}><option value="replace">Replace current stock with spreadsheet quantity</option><option value="add">Add spreadsheet quantity to current stock</option></select></label><div className="preview-table"><div className="preview-head"><span>ROW / SKU</span><span>PRODUCT</span><span>ACTION</span><span>VALIDATION</span></div>{preview.rows.slice(0,80).map((row) => <div className="preview-row" key={row.row_number}><span>#{row.row_number} · {row.sku || "—"}</span><b>{row.name || "Unnamed"}</b><span>{row.action}</span><span className={row.errors.length ? "row-error" : "row-ok"}>{row.errors.join(", ") || "Ready"}</span></div>)}</div>{preview.rows.length>80 && <small>Showing first 80 rows.</small>}<div className="import-actions"><button className="outline-action" disabled={importBusy} onClick={() => setPreview(null)}>Choose another file</button><button className="save-product" disabled={importBusy || preview.error_count>0} onClick={async () => { setImportBusy(true); try { await api.commitImport(preview.import_id,stockMode); setShowImport(false); setPreview(null); await refresh(); } catch(e) { setError(e instanceof Error ? e.message : "Import could not be committed"); } finally { setImportBusy(false); } }}>{importBusy ? "Importing…" : "Commit import"}</button></div></>}
+    </section></div>}
     {showAdd && <div className="modal-backdrop" onClick={() => setShowAdd(false)}><form className="modal" onSubmit={saveProduct} onClick={(event) => event.stopPropagation()}>
       <div className="modal-heading"><div><div className="section-kicker">PRODUCT CATALOGUE</div><h3>Add a product</h3></div><button type="button" className="modal-close" onClick={() => setShowAdd(false)}><X size={18}/></button></div>
       <label>Product name<input required value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Aashirvaad Atta 5kg"/></label>
