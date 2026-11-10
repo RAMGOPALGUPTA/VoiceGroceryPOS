@@ -32,3 +32,31 @@ jobs:
           node-version: "22"
       - run: npm install
       - run: npm run build
+
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare backend environment
+        shell: pwsh
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/Scripts/python.exe -m pip install --upgrade pip
+          backend/.venv/Scripts/python.exe -m pip install -r backend/requirements-desktop.txt
+      - name: Build Windows desktop installer
+        working-directory: frontend
+        shell: pwsh
+        run: |
+          npm install
+          npm run desktop:package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VoiceGroceryPOS-Windows-Installer
+          path: frontend/release/*.exe
+          if-no-files-found: error
