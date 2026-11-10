@@ -22,7 +22,11 @@ export default function App() {
   const [category, setCategory] = useState("All items");
   const [health, setHealth] = useState("Checking");
   const [error, setError] = useState("");
-  const [showAdd, setShowAdd] = useState(false);\n  const [showImport, setShowImport] = useState(false);\n  const [preview, setPreview] = useState<ImportPreview | null>(null);\n  const [stockMode, setStockMode] = useState<"replace" | "add">("replace");\n  const [importBusy, setImportBusy] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [stockMode, setStockMode] = useState<"replace" | "add">("replace");
+  const [importBusy, setImportBusy] = useState(false);
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState("");
