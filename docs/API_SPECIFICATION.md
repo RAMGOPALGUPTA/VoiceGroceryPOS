@@ -83,3 +83,11 @@ PRODUCT_NOT_FOUND, PRODUCT_AMBIGUOUS, PRODUCT_INACTIVE, UNIT_INCOMPATIBLE, INSUF
 | GET | `/api/v1/inventory/movements` | List stock movement history |
 
 Stock adjustments reject a resulting negative balance. Product creation records non-zero opening stock in the stock movement ledger. Product deletion is a soft deactivation; historical records are not removed.
+
+
+## Inventory spreadsheet import
+
+- `POST /api/v1/inventory/import/preview` — multipart upload of CSV, XLSX, or XLSM (10 MB maximum). Required columns: SKU, product name, selling price. Optional columns include stock quantity, brand, barcode, cost price, stock/sale units, tax rate, and reorder level. Header aliases are accepted.
+- Preview persists normalized rows locally and returns row-level validation errors plus create/update classification. Preview does not modify products or stock.
+- `POST /api/v1/inventory/import/{import_id}/commit?stock_mode=replace|add` — commits only a preview with zero row errors. The operation is transactional. `replace` sets the supplied stock quantity; `add` adds it to current stock. Omitted stock quantities leave stock unchanged.
+- Each non-zero stock change writes a stock-ledger movement. Rows missing from the spreadsheet are never deleted or deactivated. An import preview can be committed once.
