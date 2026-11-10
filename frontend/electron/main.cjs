@@ -33,7 +33,8 @@ function startBackend() {
     });
   } else {
     const executable = path.join(process.resourcesPath, 'backend', 'voicegrocery-backend.exe');
-    const databasePath = path.join(app.getPath('userData'), 'voicegrocery.db').replace(/\\\\/g, '/');\n    backend = spawn(executable, [], { windowsHide: true, stdio: 'inherit', env: { ...process.env, DATABASE_URL: `sqlite:///${databasePath}` } });
+    const databasePath = path.join(app.getPath('userData'), 'voicegrocery.db').replace(/\\/g, '/');
+    backend = spawn(executable, [], { windowsHide: true, stdio: 'inherit', env: { ...process.env, DATABASE_URL: `sqlite:///${databasePath}` } });
   }
   ownsBackend = true;
 }
@@ -64,6 +65,11 @@ async function createWindow() {
   }
 }
 
-app.whenReady().then(() => {\n  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {\n    callback(permission === 'media' || permission === 'microphone');\n  });\n  return createWindow();\n});
+app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === 'media' || permission === 'microphone');
+  });
+  return createWindow();
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('before-quit', () => { if (ownsBackend && backend && !backend.killed) backend.kill(); });
