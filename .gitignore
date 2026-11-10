@@ -55,3 +55,6 @@ models/asr/
 Thumbs.db
 .vscode/
 .idea/
+
+# Downloaded offline ASR model files
+backend/models/faster-whisper-small/
