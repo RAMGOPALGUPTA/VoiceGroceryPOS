@@ -14,6 +14,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export type Sale = {id:number;receipt_number:string;status:string;subtotal:string;tax_total:string;discount_total:string;grand_total:string;payment_method:string;created_at:string;items:{product_id:number;name_snapshot:string;sku_snapshot:string;quantity:string;unit_price:string;line_total:string;unit_snapshot:string}[]};
 export type StockSummary = {product_count:number;low_stock_count:number;products:Product[]};
 export type ReportSummary = {today_sales_count:number;today_revenue:string;all_time_sales_count:number;all_time_revenue:string;low_stock_count:number;inventory_units:string};
+export type VoiceStatus = {enabled:boolean;package_available:boolean;model_available:boolean;model_path:string;message:string};
 export type ImportRow = { row_number:number; sku?:string|null; name?:string|null; selling_price?:string|null; stock_quantity?:string|null; action:string; errors:string[] };
 export type ImportPreview = { import_id:string; filename:string; row_count:number; valid_count:number; error_count:number; rows:ImportRow[]; stock_modes:string[] };
 export const api = {
@@ -26,6 +27,7 @@ export const api = {
   },
   commitImport: (id:string, mode:"replace"|"add") => request<{status:string;processed_rows:number}>(`/inventory/import/${id}/commit?stock_mode=${mode}`, { method:"POST" }),
   products: () => request<Product[]>('/products'),
+  voiceStatus: () => request<VoiceStatus>("/voice/status"),
   transcribe: async (blob:Blob) => { const form=new FormData(); form.append("file",blob,"voice.webm"); const response=await fetch("http://127.0.0.1:8000/api/v1/voice/transcribe",{method:"POST",body:form}); if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.detail||"Voice transcription failed");} const transcript=await response.json() as {text:string;language:string;language_probability:number}; return request<{transcript:string;items:{product_id:number;name:string;quantity:string;unit:string;selling_price:string;confidence:number;requires_confirmation:boolean}[];unmatched_text:string;confirmation_required:boolean}>("/voice/interpret",{method:"POST",body:JSON.stringify({transcript:transcript.text})}); },
   checkout: (payload:{idempotency_key:string;payment_method:"cash"|"upi"|"card"|"other";discount:string;items:{product_id:number;quantity:number}[]}) => request<Sale>('/sales/checkout',{method:'POST',body:JSON.stringify(payload)}),
   sales: () => request<Sale[]>('/sales'),
