@@ -19,7 +19,14 @@ import {
   CircleHelp,
   Command,
 } from "lucide-react";
-import { api, type Product, type ImportPreview, type Sale, type StockSummary, type ReportSummary } from "./lib/api";
+import {
+  api,
+  type Product,
+  type ImportPreview,
+  type Sale,
+  type StockSummary,
+  type ReportSummary,
+} from "./lib/api";
 
 type CartLine = { product: Product; quantity: number };
 const categories = [
@@ -50,11 +57,15 @@ const money = (value: number) =>
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [page, setPage] = useState<"sale"|"stock"|"sales"|"reports">("sale");
+  const [page, setPage] = useState<"sale" | "stock" | "sales" | "reports">(
+    "sale",
+  );
   const [sales, setSales] = useState<Sale[]>([]);
   const [inventory, setInventory] = useState<StockSummary | null>(null);
   const [reports, setReports] = useState<ReportSummary | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"cash"|"upi"|"card"|"other">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "cash" | "upi" | "card" | "other"
+  >("cash");
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -62,7 +73,17 @@ export default function App() {
   const [voiceReady, setVoiceReady] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
-  const [voiceResult, setVoiceResult] = useState<{transcript:string;items:{product_id:number;name:string;quantity:string;unit:string;selling_price:string;confidence:number}[]}|null>(null);
+  const [voiceResult, setVoiceResult] = useState<{
+    transcript: string;
+    items: {
+      product_id: number;
+      name: string;
+      quantity: string;
+      unit: string;
+      selling_price: string;
+      confidence: number;
+    }[];
+  } | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All items");
@@ -80,7 +101,11 @@ export default function App() {
 
   async function refresh() {
     try {
-      const result = await Promise.all([api.products(), api.health(), api.voiceStatus()]);
+      const result = await Promise.all([
+        api.products(),
+        api.health(),
+        api.voiceStatus(),
+      ]);
       setProducts(result[0]);
       setHealth(result[1].database === "connected" ? "Connected" : "Degraded");
       setVoiceReady(result[2].enabled);
@@ -95,11 +120,25 @@ export default function App() {
       );
     }
   }
-  useEffect(() => { void refresh(); }, []);
   useEffect(() => {
-    if (page === "stock") void api.inventory().then(setInventory).catch(e => setError(e.message));
-    if (page === "sales") void api.sales().then(setSales).catch(e => setError(e.message));
-    if (page === "reports") void api.reports().then(setReports).catch(e => setError(e.message));
+    void refresh();
+  }, []);
+  useEffect(() => {
+    if (page === "stock")
+      void api
+        .inventory()
+        .then(setInventory)
+        .catch((e) => setError(e.message));
+    if (page === "sales")
+      void api
+        .sales()
+        .then(setSales)
+        .catch((e) => setError(e.message));
+    if (page === "reports")
+      void api
+        .reports()
+        .then(setReports)
+        .catch((e) => setError(e.message));
   }, [page]);
   const filtered = useMemo(
     () =>
@@ -125,7 +164,15 @@ export default function App() {
     0,
   );
   const itemCount = cart.reduce((sum, line) => sum + line.quantity, 0);
-  const taxTotal = cart.reduce((sum,line) => sum + Number(line.product.selling_price) * line.quantity * Number(line.product.tax_rate || 0) / 100, 0);
+  const taxTotal = cart.reduce(
+    (sum, line) =>
+      sum +
+      (Number(line.product.selling_price) *
+        line.quantity *
+        Number(line.product.tax_rate || 0)) /
+        100,
+    0,
+  );
   const amountDue = subtotal + taxTotal;
 
   function add(product: Product) {
@@ -183,19 +230,35 @@ export default function App() {
           <span>SV</span>
         </div>
         <div className="rail-rule" />
-        <button className={page === "sale" ? "rail-link selected" : "rail-link"} title="Point of sale" onClick={() => setPage("sale")}>
+        <button
+          className={page === "sale" ? "rail-link selected" : "rail-link"}
+          title="Point of sale"
+          onClick={() => setPage("sale")}
+        >
           <ShoppingCart size={19} />
           <small>Sale</small>
         </button>
-        <button className={page === "stock" ? "rail-link selected" : "rail-link"} title="Inventory" onClick={() => setPage("stock")}>
+        <button
+          className={page === "stock" ? "rail-link selected" : "rail-link"}
+          title="Inventory"
+          onClick={() => setPage("stock")}
+        >
           <Boxes size={19} />
           <small>Stock</small>
         </button>
-        <button className={page === "sales" ? "rail-link selected" : "rail-link"} title="Sales history" onClick={() => setPage("sales")}>
+        <button
+          className={page === "sales" ? "rail-link selected" : "rail-link"}
+          title="Sales history"
+          onClick={() => setPage("sales")}
+        >
           <ClipboardList size={19} />
           <small>Sales</small>
         </button>
-        <button className={page === "reports" ? "rail-link selected" : "rail-link"} title="Reports" onClick={() => setPage("reports")}>
+        <button
+          className={page === "reports" ? "rail-link selected" : "rail-link"}
+          title="Reports"
+          onClick={() => setPage("reports")}
+        >
           <ChartNoAxesCombined size={19} />
           <small>Reports</small>
         </button>
@@ -238,7 +301,10 @@ export default function App() {
             <button onClick={() => void refresh()}>Try again</button>
           </div>
         )}
-        <div className="pos-layout" style={{display:page === "sale" ? "grid" : "none"}}>
+        <div
+          className="pos-layout"
+          style={{ display: page === "sale" ? "grid" : "none" }}
+        >
           <section className="browse-area">
             <div className="section-heading">
               <div>
@@ -420,11 +486,54 @@ export default function App() {
                 <strong>{money(amountDue)}</strong>
               </div>
             </div>
-            <button className="charge-button" disabled={cart.length === 0 || checkoutBusy || health !== "Connected"} onClick={async () => { setCheckoutBusy(true); try { const sale = await api.checkout({idempotency_key:crypto.randomUUID(),payment_method:paymentMethod,discount:"0",items:cart.map(line=>({product_id:line.product.id,quantity:line.quantity}))}); setLastSale(sale); setCart([]); await refresh(); } catch(e) { setError(e instanceof Error ? e.message : "Checkout failed"); } finally { setCheckoutBusy(false); } }}>
+            <button
+              className="charge-button"
+              disabled={
+                cart.length === 0 || checkoutBusy || health !== "Connected"
+              }
+              onClick={async () => {
+                setCheckoutBusy(true);
+                try {
+                  const sale = await api.checkout({
+                    idempotency_key: crypto.randomUUID(),
+                    payment_method: paymentMethod,
+                    discount: "0",
+                    items: cart.map((line) => ({
+                      product_id: line.product.id,
+                      quantity: line.quantity,
+                    })),
+                  });
+                  setLastSale(sale);
+                  setCart([]);
+                  await refresh();
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Checkout failed");
+                } finally {
+                  setCheckoutBusy(false);
+                }
+              }}
+            >
               <span>{checkoutBusy ? "Processing…" : "Take payment"}</span>
               <b>{money(subtotal)}</b>
             </button>
-            <div className="payment-method"><label>Payment<select value={paymentMethod} onChange={event=>setPaymentMethod(event.target.value as "cash"|"upi"|"card"|"other")}><option value="cash">Cash</option><option value="upi">UPI</option><option value="card">Card</option><option value="other">Other</option></select></label></div>
+            <div className="payment-method">
+              <label>
+                Payment
+                <select
+                  value={paymentMethod}
+                  onChange={(event) =>
+                    setPaymentMethod(
+                      event.target.value as "cash" | "upi" | "card" | "other",
+                    )
+                  }
+                >
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI</option>
+                  <option value="card">Card</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+            </div>
             <div className="bill-actions">
               <button onClick={() => setCart([])} disabled={cart.length === 0}>
                 <Trash2 size={14} /> Clear bill
@@ -440,13 +549,197 @@ export default function App() {
           </aside>
         </div>
 
-        {page !== "sale" && <section className="module-page">
-          <div className="section-kicker">{page === "stock" ? "INVENTORY CONTROL" : page === "sales" ? "TRANSACTION LEDGER" : "STORE PERFORMANCE"}</div>
-          <h2>{page === "stock" ? "Stock on hand" : page === "sales" ? "Sales history" : "Reports overview"}</h2>
-          {page === "stock" && inventory && <><div className="module-stats"><div><small>ACTIVE PRODUCTS</small><b>{inventory.product_count}</b></div><div><small>LOW STOCK ITEMS</small><b>{inventory.low_stock_count}</b></div></div><div className="data-table"><div className="data-head"><span>PRODUCT</span><span>SKU</span><span>ON HAND</span><span>PRICE</span><span>STATUS</span></div>{inventory.products.map(p=><div className="data-row" key={p.id}><b>{p.name}</b><span>{p.sku}</span><span>{p.stock_quantity} {p.stock_unit}</span><span>{money(Number(p.selling_price))}</span><span>{Number(p.stock_quantity)<=0?"Out of stock":Number(p.stock_quantity)<=Number(p.reorder_level)?"Reorder":"In stock"}</span><button className="table-action" onClick={async()=>{const newName=window.prompt("Product name:",p.name);if(newName===null||!newName.trim())return;const newPrice=window.prompt("Selling price (₹):",String(p.selling_price));if(newPrice===null||!newPrice.trim())return;try{await api.updateProduct(p.id,{name:newName.trim(),selling_price:newPrice});setInventory(await api.inventory());await refresh();}catch(e){setError(e instanceof Error?e.message:"Product update failed");}}}>Edit</button><button className="table-action" onClick={async()=>{const value=window.prompt("Enter stock change (use a negative number to remove stock):");if(value===null||!value.trim())return;try{await api.adjustStock(p.id,value,"Manual adjustment from Stock screen");setInventory(await api.inventory());await refresh();}catch(e){setError(e instanceof Error?e.message:"Stock adjustment failed");}}}>Adjust</button></div>)}</div></>}
-          {page === "sales" && <div className="data-table"><div className="data-head"><span>RECEIPT</span><span>DATE</span><span>ITEMS</span><span>PAYMENT</span><span>TOTAL</span></div>{sales.map(sale=><div className="data-row clickable-row" key={sale.id} onClick={()=>setLastSale(sale)} title="Open receipt details"><b>{sale.receipt_number}</b><span>{new Date(sale.created_at).toLocaleString()}</span><span>{sale.items.length}</span><span>{sale.payment_method.toUpperCase()}</span><b>{money(Number(sale.grand_total))}</b><button className="table-action" onClick={async event=>{event.stopPropagation();if(!window.confirm("Refund this entire sale and restore its stock?"))return;const reason=window.prompt("Reason for refund:");if(!reason)return;try{await api.refund(sale.id,reason);setSales(await api.sales());setInventory(await api.inventory().catch(()=>null));}catch(e){setError(e instanceof Error?e.message:"Refund failed");}}} disabled={sale.status!=="completed"}>Refund</button></div>)}{sales.length===0&&<p className="module-empty">No completed sales yet.</p>}</div>}
-          {page === "reports" && reports && <div className="module-stats"><div><small>TODAY'S REVENUE</small><b>{money(Number(reports.today_revenue))}</b><span>{reports.today_sales_count} transactions</span></div><div><small>ALL-TIME REVENUE</small><b>{money(Number(reports.all_time_revenue))}</b><span>{reports.all_time_sales_count} transactions</span></div><div><small>LOW STOCK</small><b>{reports.low_stock_count}</b></div><div><small>INVENTORY UNITS</small><b>{reports.inventory_units}</b></div></div>}
-        </section>}
+        {page !== "sale" && (
+          <section className="module-page">
+            <div className="section-kicker">
+              {page === "stock"
+                ? "INVENTORY CONTROL"
+                : page === "sales"
+                  ? "TRANSACTION LEDGER"
+                  : "STORE PERFORMANCE"}
+            </div>
+            <h2>
+              {page === "stock"
+                ? "Stock on hand"
+                : page === "sales"
+                  ? "Sales history"
+                  : "Reports overview"}
+            </h2>
+            {page === "stock" && inventory && (
+              <>
+                <div className="module-stats">
+                  <div>
+                    <small>ACTIVE PRODUCTS</small>
+                    <b>{inventory.product_count}</b>
+                  </div>
+                  <div>
+                    <small>LOW STOCK ITEMS</small>
+                    <b>{inventory.low_stock_count}</b>
+                  </div>
+                </div>
+                <div className="data-table">
+                  <div className="data-head">
+                    <span>PRODUCT</span>
+                    <span>SKU</span>
+                    <span>ON HAND</span>
+                    <span>PRICE</span>
+                    <span>STATUS</span>
+                  </div>
+                  {inventory.products.map((p) => (
+                    <div className="data-row" key={p.id}>
+                      <b>{p.name}</b>
+                      <span>{p.sku}</span>
+                      <span>
+                        {p.stock_quantity} {p.stock_unit}
+                      </span>
+                      <span>{money(Number(p.selling_price))}</span>
+                      <span>
+                        {Number(p.stock_quantity) <= 0
+                          ? "Out of stock"
+                          : Number(p.stock_quantity) <= Number(p.reorder_level)
+                            ? "Reorder"
+                            : "In stock"}
+                      </span>
+                      <button
+                        className="table-action"
+                        onClick={async () => {
+                          const newName = window.prompt(
+                            "Product name:",
+                            p.name,
+                          );
+                          if (newName === null || !newName.trim()) return;
+                          const newPrice = window.prompt(
+                            "Selling price (₹):",
+                            String(p.selling_price),
+                          );
+                          if (newPrice === null || !newPrice.trim()) return;
+                          try {
+                            await api.updateProduct(p.id, {
+                              name: newName.trim(),
+                              selling_price: newPrice,
+                            });
+                            setInventory(await api.inventory());
+                            await refresh();
+                          } catch (e) {
+                            setError(
+                              e instanceof Error
+                                ? e.message
+                                : "Product update failed",
+                            );
+                          }
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="table-action"
+                        onClick={async () => {
+                          const value = window.prompt(
+                            "Enter stock change (use a negative number to remove stock):",
+                          );
+                          if (value === null || !value.trim()) return;
+                          try {
+                            await api.adjustStock(
+                              p.id,
+                              value,
+                              "Manual adjustment from Stock screen",
+                            );
+                            setInventory(await api.inventory());
+                            await refresh();
+                          } catch (e) {
+                            setError(
+                              e instanceof Error
+                                ? e.message
+                                : "Stock adjustment failed",
+                            );
+                          }
+                        }}
+                      >
+                        Adjust
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {page === "sales" && (
+              <div className="data-table">
+                <div className="data-head">
+                  <span>RECEIPT</span>
+                  <span>DATE</span>
+                  <span>ITEMS</span>
+                  <span>PAYMENT</span>
+                  <span>TOTAL</span>
+                </div>
+                {sales.map((sale) => (
+                  <div
+                    className="data-row clickable-row"
+                    key={sale.id}
+                    onClick={() => setLastSale(sale)}
+                    title="Open receipt details"
+                  >
+                    <b>{sale.receipt_number}</b>
+                    <span>{new Date(sale.created_at).toLocaleString()}</span>
+                    <span>{sale.items.length}</span>
+                    <span>{sale.payment_method.toUpperCase()}</span>
+                    <b>{money(Number(sale.grand_total))}</b>
+                    <button
+                      className="table-action"
+                      onClick={async (event) => {
+                        event.stopPropagation();
+                        if (
+                          !window.confirm(
+                            "Refund this entire sale and restore its stock?",
+                          )
+                        )
+                          return;
+                        const reason = window.prompt("Reason for refund:");
+                        if (!reason) return;
+                        try {
+                          await api.refund(sale.id, reason);
+                          setSales(await api.sales());
+                          setInventory(await api.inventory().catch(() => null));
+                        } catch (e) {
+                          setError(
+                            e instanceof Error ? e.message : "Refund failed",
+                          );
+                        }
+                      }}
+                      disabled={sale.status !== "completed"}
+                    >
+                      Refund
+                    </button>
+                  </div>
+                ))}
+                {sales.length === 0 && (
+                  <p className="module-empty">No completed sales yet.</p>
+                )}
+              </div>
+            )}
+            {page === "reports" && reports && (
+              <div className="module-stats">
+                <div>
+                  <small>TODAY'S REVENUE</small>
+                  <b>{money(Number(reports.today_revenue))}</b>
+                  <span>{reports.today_sales_count} transactions</span>
+                </div>
+                <div>
+                  <small>ALL-TIME REVENUE</small>
+                  <b>{money(Number(reports.all_time_revenue))}</b>
+                  <span>{reports.all_time_sales_count} transactions</span>
+                </div>
+                <div>
+                  <small>LOW STOCK</small>
+                  <b>{reports.low_stock_count}</b>
+                </div>
+                <div>
+                  <small>INVENTORY UNITS</small>
+                  <b>{reports.inventory_units}</b>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
         <footer className="work-footer">
           <div>
             <span className="footer-live" /> LOCAL MODE{" "}
@@ -459,7 +752,11 @@ export default function App() {
         </footer>
       </main>
       <button
-        className={"voice-button" + (recording ? " is-recording" : "") + (voiceBusy ? " is-processing" : "")}
+        className={
+          "voice-button" +
+          (recording ? " is-recording" : "") +
+          (voiceBusy ? " is-processing" : "")
+        }
         disabled={voiceBusy || health !== "Connected"}
         onClick={async () => {
           if (recording) {
@@ -469,41 +766,65 @@ export default function App() {
           }
           try {
             setError("");
-            if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-              throw new Error("This desktop runtime does not support microphone recording. Restart the Electron app and check microphone permissions.");
+            if (
+              !navigator.mediaDevices?.getUserMedia ||
+              typeof MediaRecorder === "undefined"
+            ) {
+              throw new Error(
+                "This desktop runtime does not support microphone recording. Restart the Electron app and check microphone permissions.",
+              );
             }
             const stream = await navigator.mediaDevices.getUserMedia({
-              audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
             });
-            const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+            const mimeType = MediaRecorder.isTypeSupported(
+              "audio/webm;codecs=opus",
+            )
               ? "audio/webm;codecs=opus"
               : "audio/webm";
             const recorder = new MediaRecorder(stream, { mimeType });
             recorderRef.current = recorder;
             audioChunks.current = [];
-            recorder.ondataavailable = event => {
+            recorder.ondataavailable = (event) => {
               if (event.data.size > 0) audioChunks.current.push(event.data);
             };
             recorder.onerror = () => {
-              stream.getTracks().forEach(track => track.stop());
+              stream.getTracks().forEach((track) => track.stop());
               setRecording(false);
-              setError("Microphone recording failed. Check that no other application is using the microphone.");
+              setError(
+                "Microphone recording failed. Check that no other application is using the microphone.",
+              );
             };
             recorder.onstop = async () => {
-              stream.getTracks().forEach(track => track.stop());
+              stream.getTracks().forEach((track) => track.stop());
               setRecording(false);
-              const audio = new Blob(audioChunks.current, { type: recorder.mimeType || "audio/webm" });
+              const audio = new Blob(audioChunks.current, {
+                type: recorder.mimeType || "audio/webm",
+              });
               if (!audio.size) {
-                setError("No audio was captured. Hold the microphone button while speaking, then release it.");
+                setError(
+                  "No audio was captured. Hold the microphone button while speaking, then release it.",
+                );
                 return;
               }
               setVoiceBusy(true);
               try {
                 const result = await api.transcribe(audio);
                 setVoiceResult(result);
-                if (!result.transcript.trim()) setError("No speech was detected. Try speaking closer to the microphone.");
+                if (!result.transcript.trim())
+                  setError(
+                    "No speech was detected. Try speaking closer to the microphone.",
+                  );
               } catch (error) {
-                setError(error instanceof Error ? error.message : "Voice processing failed");
+                setError(
+                  error instanceof Error
+                    ? error.message
+                    : "Voice processing failed",
+                );
               } finally {
                 setVoiceBusy(false);
               }
@@ -511,20 +832,146 @@ export default function App() {
             recorder.start();
             setRecording(true);
           } catch (error) {
-            setError(error instanceof Error ? error.message : "Microphone permission unavailable");
+            setError(
+              error instanceof Error
+                ? error.message
+                : "Microphone permission unavailable",
+            );
           }
         }}
-        title={recording ? "Click to stop recording" : "Click to start recording, speak, then click again to transcribe"}
-        aria-label={recording ? "Stop voice recording" : "Start voice recording"}
+        title={
+          recording
+            ? "Click to stop recording"
+            : "Click to start recording, speak, then click again to transcribe"
+        }
+        aria-label={
+          recording ? "Stop voice recording" : "Start voice recording"
+        }
       >
         <Mic size={18} />
-        <span>{recording ? "Stop recording" : voiceBusy ? "Transcribing…" : "Voice entry"}</span>
-        <small>{recording ? "LIVE" : voiceBusy ? "WAIT" : voiceReady ? "LOCAL" : "SETUP"}</small>
+        <span>
+          {recording
+            ? "Stop recording"
+            : voiceBusy
+              ? "Transcribing…"
+              : "Voice entry"}
+        </span>
+        <small>
+          {recording
+            ? "LIVE"
+            : voiceBusy
+              ? "WAIT"
+              : voiceReady
+                ? "LOCAL"
+                : "SETUP"}
+        </small>
       </button>
 
-
-      {lastSale && <div className="modal-backdrop"><section className="modal receipt-modal"><div className="modal-heading"><div><div className="section-kicker">PAYMENT COMPLETE</div><h3>{lastSale.receipt_number}</h3></div><button className="modal-close" onClick={()=>setLastSale(null)}><X size={18}/></button></div><p>{lastSale.status === "refunded" ? "This sale has been refunded." : "Sale saved. Stock was deducted and payment recorded."}</p><div className="receipt-lines">{lastSale.items.map((item,index)=><div key={index}><span>{item.name_snapshot} × {item.quantity}</span><b>{money(Number(item.line_total))}</b></div>)}</div><div className="receipt-total"><span>Total paid</span><b>{money(Number(lastSale.grand_total))}</b></div><button className="save-product" onClick={()=>window.print()}>Print receipt</button></section></div>}
-      {voiceResult && <div className="modal-backdrop"><section className="modal receipt-modal"><div className="modal-heading"><div><div className="section-kicker">VOICE DRAFT · REVIEW REQUIRED</div><h3>Confirm spoken items</h3></div><button className="modal-close" onClick={()=>setVoiceResult(null)}><X size={18}/></button></div><p>{voiceResult.transcript || "No speech detected"}</p><div className="receipt-lines">{voiceResult.items.map((item,index)=><div key={index}><span>{item.name} · {item.quantity} {item.unit}</span><b>{money(Number(item.selling_price)*Number(item.quantity))}</b><button className="outline-action" onClick={()=>{const p=products.find(x=>x.id===item.product_id);if(p){setCart(current=>{const found=current.find(line=>line.product.id===p.id);return found?current.map(line=>line.product.id===p.id?{...line,quantity:line.quantity+Number(item.quantity)}:line):[...current,{product:p,quantity:Number(item.quantity)}]});}}}>Add</button></div>)}</div><button className="save-product" onClick={()=>setVoiceResult(null)}>Done reviewing</button></section></div>}
+      {lastSale && (
+        <div className="modal-backdrop">
+          <section className="modal receipt-modal">
+            <div className="modal-heading">
+              <div>
+                <div className="section-kicker">PAYMENT COMPLETE</div>
+                <h3>{lastSale.receipt_number}</h3>
+              </div>
+              <button className="modal-close" onClick={() => setLastSale(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <p>
+              {lastSale.status === "refunded"
+                ? "This sale has been refunded."
+                : "Sale saved. Stock was deducted and payment recorded."}
+            </p>
+            <div className="receipt-lines">
+              {lastSale.items.map((item, index) => (
+                <div key={index}>
+                  <span>
+                    {item.name_snapshot} × {item.quantity}
+                  </span>
+                  <b>{money(Number(item.line_total))}</b>
+                </div>
+              ))}
+            </div>
+            <div className="receipt-total">
+              <span>Total paid</span>
+              <b>{money(Number(lastSale.grand_total))}</b>
+            </div>
+            <button className="save-product" onClick={() => window.print()}>
+              Print receipt
+            </button>
+          </section>
+        </div>
+      )}
+      {voiceResult && (
+        <div className="modal-backdrop">
+          <section className="modal receipt-modal">
+            <div className="modal-heading">
+              <div>
+                <div className="section-kicker">
+                  VOICE DRAFT · REVIEW REQUIRED
+                </div>
+                <h3>Confirm spoken items</h3>
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => setVoiceResult(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p>{voiceResult.transcript || "No speech detected"}</p>
+            <div className="receipt-lines">
+              {voiceResult.items.map((item, index) => (
+                <div key={index}>
+                  <span>
+                    {item.name} · {item.quantity} {item.unit}
+                  </span>
+                  <b>
+                    {money(Number(item.selling_price) * Number(item.quantity))}
+                  </b>
+                  <button
+                    className="outline-action"
+                    onClick={() => {
+                      const p = products.find((x) => x.id === item.product_id);
+                      if (p) {
+                        setCart((current) => {
+                          const found = current.find(
+                            (line) => line.product.id === p.id,
+                          );
+                          return found
+                            ? current.map((line) =>
+                                line.product.id === p.id
+                                  ? {
+                                      ...line,
+                                      quantity:
+                                        line.quantity + Number(item.quantity),
+                                    }
+                                  : line,
+                              )
+                            : [
+                                ...current,
+                                { product: p, quantity: Number(item.quantity) },
+                              ];
+                        });
+                      }
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              className="save-product"
+              onClick={() => setVoiceResult(null)}
+            >
+              Done reviewing
+            </button>
+          </section>
+        </div>
+      )}
       {showImport && (
         <div
           className="modal-backdrop"
