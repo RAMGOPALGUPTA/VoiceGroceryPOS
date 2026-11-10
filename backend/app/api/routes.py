@@ -473,6 +473,7 @@ def voice_interpret(payload: VoiceInterpretRequest, db: Session = Depends(get_db
         alias_map[normalize_alias(product.sku)] = product
         if product.brand:
             alias_map.setdefault(normalize_alias(product.brand + " " + product.name), product)
+            alias_map.setdefault(normalize_alias(product.brand), product)
     for alias in aliases:
         alias_map[normalize_alias(alias.alias)] = next((p for p in products if p.id == alias.product_id), None)
     alias_map = {k:v for k,v in alias_map.items() if v is not None}
@@ -485,7 +486,7 @@ def voice_interpret(payload: VoiceInterpretRequest, db: Session = Depends(get_db
     for alias in sorted(tokens, key=len, reverse=True):
         if alias and alias in text:
             before = text[:text.index(alias)]
-            qty_match = _re.search(r"([0-9]+(?:\.[0-9]+)?|एक|दो|तीन|चार|पांच|पाँच|छह|सात|आठ|नौ|दस|one|two|three|four|five|six|seven|eight|nine|ten|ek|do|teen|char|paanch|che|chhe|saat|aath|nau|das)\s*$", before)
+            qty_match = _re.search(r"([0-9]+(?:\.[0-9]+)?|एक|दो|तीन|चार|पांच|पाँच|छह|सात|आठ|नौ|दस|one|two|three|four|five|six|seven|eight|nine|ten|ek|do|teen|char|paanch|che|chhe|saat|aath|nau|das)(?:\s*(?:kg|kilo|kilos|gram|grams|g|litre|liter|ltr|packet|packets|pcs|piece|pieces))?\s*$", before)
             qty = Decimal(qty_match.group(1)) if qty_match and re.match(r"^[0-9]",qty_match.group(1)) else Decimal(number_words.get(qty_match.group(1),1)) if qty_match else Decimal("1")
             product = alias_map[alias]
             if not any(x["product_id"] == product.id for x in found):
