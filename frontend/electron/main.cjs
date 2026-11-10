@@ -1,37 +1,69 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const http = require('node:http');
 
 let backend;
+let ownsBackend = false;
 let mainWindow;
 const isDev = !app.isPackaged;
 
-function waitForBackend(attempt = 0) {
-  return new Promise((resolve, reject) => {
-    const req = http.get('http://127.0.0.1:8000/health', res => { res.resume(); resolve(true); });
-    req.on('error', () => attempt >= 40 ? reject(new Error('Local backend did not start')) : setTimeout(() => waitForBackend(attempt + 1).then(resolve, reject), 500));
-    req.setTimeout(700, () => req.destroy());
+function probeBackend() {
+  return new Promise((resolve) => {
+    const req = http.get('http://127.0.0.1:8000/health', (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try {
+          const health = JSON.parse(body);
+          resolve(res.statusCode === 200 && health.database === 'connected');
+        } catch { resolve(false); }
+      });
+    });
+    req.setTimeout(900, () => req.destroy());
+    req.on('error', () => resolve(false));
   });
 }
 
 function startBackend() {
   if (isDev) {
-    backend = spawn('python', ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000'], { cwd: path.join(__dirname, '../../backend'), windowsHide: true, stdio: 'inherit' });
+    backend = spawn('python', ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000'], {
+      cwd: path.join(__dirname, '../../backend'), windowsHide: true, stdio: 'inherit'
+    });
   } else {
     const executable = path.join(process.resourcesPath, 'backend', 'voicegrocery-backend.exe');
     backend = spawn(executable, [], { windowsHide: true, stdio: 'inherit' });
   }
+  ownsBackend = true;
+}
+
+async function waitForBackend(attempts = 40) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (await probeBackend()) return true;
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  return false;
 }
 
 async function createWindow() {
-  startBackend();
-  try { await waitForBackend(); } catch (error) { console.error(error); }
-  mainWindow = new BrowserWindow({ width: 1440, height: 920, minWidth: 1000, minHeight: 700, backgroundColor: '#0a0f1a', webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  // Reuse a healthy local API (e.g. one started manually for debugging).
+  // Never spawn a second process blindly on the same fixed port.
+  const alreadyRunning = await probeBackend();
+  if (!alreadyRunning) startBackend();
+  const ready = alreadyRunning || await waitForBackend();
+  mainWindow = new BrowserWindow({
+    width: 1440, height: 920, minWidth: 1000, minHeight: 700,
+    backgroundColor: '#eeede7',
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+  });
   if (isDev) await mainWindow.loadURL('http://127.0.0.1:5173');
   else await mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+  if (!ready) {
+    dialog.showErrorBox('Local backend unavailable', 'VoiceGroceryPOS could not connect to its local API on 127.0.0.1:8000. Close other processes using that port, then restart the app.');
+  }
 }
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('before-quit', () => { if (backend && !backend.killed) backend.kill(); });
+app.on('before-quit', () => { if (ownsBackend && backend && !backend.killed) backend.kill(); });
