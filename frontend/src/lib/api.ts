@@ -11,6 +11,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export type Sale = {id:number;receipt_number:string;status:string;subtotal:string;tax_total:string;discount_total:string;grand_total:string;payment_method:string;created_at:string;items:{product_id:number;name_snapshot:string;sku_snapshot:string;quantity:string;unit_price:string;line_total:string;unit_snapshot:string}[]};
+export type StockSummary = {product_count:number;low_stock_count:number;products:Product[]};
+export type ReportSummary = {today_sales_count:number;today_revenue:string;all_time_sales_count:number;all_time_revenue:string;low_stock_count:number;inventory_units:string};
 export type ImportRow = { row_number:number; sku?:string|null; name?:string|null; selling_price?:string|null; stock_quantity?:string|null; action:string; errors:string[] };
 export type ImportPreview = { import_id:string; filename:string; row_count:number; valid_count:number; error_count:number; rows:ImportRow[]; stock_modes:string[] };
 export const api = {
@@ -23,6 +26,10 @@ export const api = {
   },
   commitImport: (id:string, mode:"replace"|"add") => request<{status:string;processed_rows:number}>(`/inventory/import/${id}/commit?stock_mode=${mode}`, { method:"POST" }),
   products: () => request<Product[]>('/products'),
+  checkout: (payload:{idempotency_key:string;payment_method:"cash"|"upi"|"card"|"other";discount:string;items:{product_id:number;quantity:number}[]}) => request<Sale>('/sales/checkout',{method:'POST',body:JSON.stringify(payload)}),
+  sales: () => request<Sale[]>('/sales'),
+  inventory: () => request<StockSummary>('/inventory/summary'),
+  reports: () => request<ReportSummary>('/reports/summary'),
   createProduct: (product: Omit<Product, 'id' | 'is_active'>) => request<Product>('/products', { method: 'POST', body: JSON.stringify(product) }),
   health: () => fetch('http://127.0.0.1:8000/health').then(r => r.json()) as Promise<{status:string;database:string}>,
 };
