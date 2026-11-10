@@ -122,6 +122,14 @@ export const api = {
       language: string;
       language_probability: number;
     };
+    if (!transcript.text?.trim()) {
+      return {
+        transcript: "",
+        items: [],
+        unmatched_text: "",
+        confirmation_required: true,
+      };
+    }
     return request<{
       transcript: string;
       items: {
