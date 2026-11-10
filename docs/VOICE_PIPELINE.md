@@ -8,17 +8,22 @@
 4. The transcript is interpreted against product names, SKUs, brands and configured aliases.
 5. Candidate lines are shown to the cashier. The cashier must explicitly add them to the cart.
 
-## Install the optional runtime
+## Install and prepare the offline runtime
 
-From the backend virtual environment:
+Run these commands from `backend` with its virtual environment activated. The model download is a one-time setup step and requires internet access; speech recognition itself is local.
 
 ```powershell
 pip install -r requirements-voice.txt
+python -m scripts.setup_voice_model
 ```
 
-Download/prepare a compatible faster-whisper model separately while internet is available and place its model files in `backend/models/faster-whisper-small`. Set `VOICE_MODEL_PATH` in the backend environment if using another local directory. Install FFmpeg and ensure it is available on PATH for WebM/MP3 decoding.
+The setup script downloads the multilingual `Systran/faster-whisper-small` model into `backend/models/faster-whisper-small`. Keep this folder on the same computer as the application. The runtime loads it with `local_files_only=True` and does not contact a model host.
 
-The application never downloads a speech model at runtime. If the model or optional package is missing, the voice API returns a clear 503 error and normal manual billing remains available.
+The faster-whisper runtime uses PyAV for media decoding; a separate FFmpeg installation is normally not required. If a machine has a codec-related error, check the exact error before installing additional codecs.
+
+Check readiness at `http://127.0.0.1:8000/api/v1/voice/status`. It reports whether the Python package and local model are both present. The desktop microphone control shows `LOCAL` when ready and `SETUP` when the optional voice runtime is missing.
+
+If using a different local model directory, set `VOICE_MODEL_PATH` to that directory before starting the backend. Do not put model files in Git; they are large binary assets.
 
 ## Language and accuracy
 
