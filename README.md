@@ -2,7 +2,7 @@
 
 Offline-first, voice-assisted grocery billing and inventory management for a single Windows counter.
 
-> **Status:** Architecture and planning documentation. Application code has not started.
+> **Status:** Active development. Architecture, backend foundation, and an initial React/Electron POS workspace are present. Billing, inventory workflows, voice, printing, packaging, and end-to-end verification are still in progress.
 
 ## Overview
 
