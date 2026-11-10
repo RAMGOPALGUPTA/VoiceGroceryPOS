@@ -19,7 +19,7 @@ import {
   CircleHelp,
   Command,
 } from "lucide-react";
-import { api, type Product, type ImportPreview } from "./lib/api";
+import { api, type Product, type ImportPreview, type Sale, type StockSummary, type ReportSummary } from "./lib/api";
 
 type CartLine = { product: Product; quantity: number };
 const categories = [
@@ -50,6 +50,13 @@ const money = (value: number) =>
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [page, setPage] = useState<"sale"|"stock"|"sales"|"reports">("sale");
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [inventory, setInventory] = useState<StockSummary | null>(null);
+  const [reports, setReports] = useState<ReportSummary | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"cash"|"upi"|"card"|"other">("cash");
+  const [lastSale, setLastSale] = useState<Sale | null>(null);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All items");
@@ -163,19 +170,19 @@ export default function App() {
           <span>SV</span>
         </div>
         <div className="rail-rule" />
-        <button className="rail-link selected" title="Point of sale">
+        <button className={page === "sale" ? "rail-link selected" : "rail-link"} title="Point of sale" onClick={() => setPage("sale")}>
           <ShoppingCart size={19} />
           <small>Sale</small>
         </button>
-        <button className="rail-link" title="Inventory">
+        <button className={page === "stock" ? "rail-link selected" : "rail-link"} title="Inventory" onClick={() => setPage("stock")}>
           <Boxes size={19} />
           <small>Stock</small>
         </button>
-        <button className="rail-link" title="Sales history">
+        <button className={page === "sales" ? "rail-link selected" : "rail-link"} title="Sales history" onClick={() => setPage("sales")}>
           <ClipboardList size={19} />
           <small>Sales</small>
         </button>
-        <button className="rail-link" title="Reports">
+        <button className={page === "reports" ? "rail-link selected" : "rail-link"} title="Reports" onClick={() => setPage("reports")}>
           <ChartNoAxesCombined size={19} />
           <small>Reports</small>
         </button>
@@ -218,7 +225,7 @@ export default function App() {
             <button onClick={() => void refresh()}>Try again</button>
           </div>
         )}
-        <div className="pos-layout">
+        <div className="pos-layout" style={{display:page === "sale" ? "grid" : "none"}}>
           <section className="browse-area">
             <div className="section-heading">
               <div>
@@ -400,10 +407,11 @@ export default function App() {
                 <strong>{money(subtotal)}</strong>
               </div>
             </div>
-            <button className="charge-button" disabled>
-              <span>Take payment</span>
+            <button className="charge-button" disabled={cart.length === 0 || checkoutBusy || health !== "Connected"} onClick={async () => { setCheckoutBusy(true); try { const sale = await api.checkout({idempotency_key:crypto.randomUUID(),payment_method:paymentMethod,discount:"0",items:cart.map(line=>({product_id:line.product.id,quantity:line.quantity}))}); setLastSale(sale); setCart([]); await refresh(); } catch(e) { setError(e instanceof Error ? e.message : "Checkout failed"); } finally { setCheckoutBusy(false); } }}>
+              <span>{checkoutBusy ? "Processing…" : "Take payment"}</span>
               <b>{money(subtotal)}</b>
             </button>
+            <div className="payment-method"><label>Payment<select value={paymentMethod} onChange={event=>setPaymentMethod(event.target.value as "cash"|"upi"|"card"|"other")}><option value="cash">Cash</option><option value="upi">UPI</option><option value="card">Card</option><option value="other">Other</option></select></label></div>
             <div className="bill-actions">
               <button onClick={() => setCart([])} disabled={cart.length === 0}>
                 <Trash2 size={14} /> Clear bill
@@ -418,6 +426,14 @@ export default function App() {
             </div>
           </aside>
         </div>
+
+        {page !== "sale" && <section className="module-page">
+          <div className="section-kicker">{page === "stock" ? "INVENTORY CONTROL" : page === "sales" ? "TRANSACTION LEDGER" : "STORE PERFORMANCE"}</div>
+          <h2>{page === "stock" ? "Stock on hand" : page === "sales" ? "Sales history" : "Reports overview"}</h2>
+          {page === "stock" && inventory && <><div className="module-stats"><div><small>ACTIVE PRODUCTS</small><b>{inventory.product_count}</b></div><div><small>LOW STOCK ITEMS</small><b>{inventory.low_stock_count}</b></div></div><div className="data-table"><div className="data-head"><span>PRODUCT</span><span>SKU</span><span>ON HAND</span><span>PRICE</span><span>STATUS</span></div>{inventory.products.map(p=><div className="data-row" key={p.id}><b>{p.name}</b><span>{p.sku}</span><span>{p.stock_quantity} {p.stock_unit}</span><span>{money(Number(p.selling_price))}</span><span>{Number(p.stock_quantity)<=0?"Out of stock":Number(p.stock_quantity)<=Number(p.reorder_level)?"Reorder":"In stock"}</span></div>)}</div></>}
+          {page === "sales" && <div className="data-table"><div className="data-head"><span>RECEIPT</span><span>DATE</span><span>ITEMS</span><span>PAYMENT</span><span>TOTAL</span></div>{sales.map(sale=><div className="data-row" key={sale.id}><b>{sale.receipt_number}</b><span>{new Date(sale.created_at).toLocaleString()}</span><span>{sale.items.length}</span><span>{sale.payment_method.toUpperCase()}</span><b>{money(Number(sale.grand_total))}</b></div>)}{sales.length===0&&<p className="module-empty">No completed sales yet.</p>}</div>}
+          {page === "reports" && reports && <div className="module-stats"><div><small>TODAY'S REVENUE</small><b>{money(Number(reports.today_revenue))}</b><span>{reports.today_sales_count} transactions</span></div><div><small>ALL-TIME REVENUE</small><b>{money(Number(reports.all_time_revenue))}</b><span>{reports.all_time_sales_count} transactions</span></div><div><small>LOW STOCK</small><b>{reports.low_stock_count}</b></div><div><small>INVENTORY UNITS</small><b>{reports.inventory_units}</b></div></div>}
+        </section>}
         <footer className="work-footer">
           <div>
             <span className="footer-live" /> LOCAL MODE{" "}
