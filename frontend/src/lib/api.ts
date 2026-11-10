@@ -32,7 +32,8 @@ export const api = {
   refund: (id:number,reason:string) => request('/sales/'+id+'/refund',{method:'POST',body:JSON.stringify({idempotency_key:crypto.randomUUID(),reason,method:'cash'})}),
   inventory: () => request<StockSummary>('/inventory/summary'),
   reports: () => request<ReportSummary>('/reports/summary'),
-  updateProduct: (id:number,patch:Partial<Pick<Product,'name'|'selling_price'|'brand'|'reorder_level'>>) => request<Product>('/products/'+id,{method:'PATCH',body:JSON.stringify(patch)}),\n  adjustStock: (id:number,delta:string,note:string) => request('/inventory/products/'+id+'/adjustments',{method:'POST',body:JSON.stringify({quantity_delta:delta,note})}),
+  updateProduct: (id:number,patch:Partial<Pick<Product,'name'|'selling_price'|'brand'|'reorder_level'>>) => request<Product>('/products/'+id,{method:'PATCH',body:JSON.stringify(patch)}),
+  adjustStock: (id:number,delta:string,note:string) => request('/inventory/products/'+id+'/adjustments',{method:'POST',body:JSON.stringify({quantity_delta:delta,note})}),
   createProduct: (product: Omit<Product, 'id' | 'is_active'>) => request<Product>('/products', { method: 'POST', body: JSON.stringify(product) }),
   health: () => fetch('http://127.0.0.1:8000/health').then(r => r.json()) as Promise<{status:string;database:string}>,
 };
