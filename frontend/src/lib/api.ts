@@ -172,7 +172,13 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(patch),
     }),
-  deactivateProduct: (id: number) => request<void>("/products/" + id, { method: "DELETE" }),
+  deactivateProduct: async (id: number) => {
+    const response = await fetch(API_BASE + "/products/" + id, { method: "DELETE" });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || "Product could not be deactivated");
+    }
+  },
   adjustStock: (id: number, delta: string, note: string) =>
     request("/inventory/products/" + id + "/adjustments", {
       method: "POST",
