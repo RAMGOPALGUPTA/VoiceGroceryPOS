@@ -6,6 +6,7 @@ export type Product = {
   name: string;
   brand?: string | null;
   selling_price: string | number;
+  cost_price?: string | number | null;
   stock_quantity: string | number;
   stock_unit: string;
   sale_unit: string;
@@ -164,13 +165,14 @@ export const api = {
   updateProduct: (
     id: number,
     patch: Partial<
-      Pick<Product, "name" | "selling_price" | "brand" | "reorder_level">
+      Pick<Product, "name" | "selling_price" | "brand" | "reorder_level" | "cost_price">
     >,
   ) =>
     request<Product>("/products/" + id, {
       method: "PATCH",
       body: JSON.stringify(patch),
     }),
+  deactivateProduct: (id: number) => request<void>("/products/" + id, { method: "DELETE" }),
   adjustStock: (id: number, delta: string, note: string) =>
     request("/inventory/products/" + id + "/adjustments", {
       method: "POST",
