@@ -1,2 +1,3 @@
-# Optional offline speech recognition. Model files are installed separately; see docs/VOICE_PIPELINE.md.
+# Optional offline speech recognition and one-time local model setup.
 faster-whisper>=1.1,<2.0
+huggingface-hub>=0.25,<2.0
