@@ -484,15 +484,15 @@ def voice_interpret(payload: VoiceInterpretRequest, db: Session = Depends(get_db
         alias_map[normalize_alias(alias.alias)] = next((p for p in products if p.id == alias.product_id), None)
     alias_map = {k:v for k,v in alias_map.items() if v is not None}
     number_words = {"one":1,"two":2,"three":3,"four":4,"five":5,"six":6,"seven":7,"eight":8,"nine":9,"ten":10,
-                    "ek":1,"do":2,"teen":3,"char":4,"paanch":5,"che":6,"chhe":6,"saat":7,"aath":8,"nau":9,"das":10,
-                    "एक":1,"दो":2,"तीन":3,"चार":4,"पांच":5,"पाँच":5,"छह":6,"सात":7,"आठ":8,"नौ":9,"दस":10}
+                    "ek":1,"ikk":1,"ik":1,"do":2,"teen":3,"tin":3,"tinn":3,"char":4,"paanch":5,"panj":5,"che":6,"chhe":6,"saat":7,"sat":7,"aath":8,"ath":8,"nau":9,"das":10,
+                    "एक":1,"दो":2,"तीन":3,"चार":4,"पांच":5,"पाँच":5,"छह":6,"सात":7,"आठ":8,"नौ":9,"दस":10,"ਇੱਕ":1,"ਇਕ":1,"ਦੋ":2,"ਤਿੰਨ":3,"ਚਾਰ":4,"ਪੰਜ":5,"ਛੇ":6,"ਸੱਤ":7,"ਅੱਠ":8,"ਨੌਂ":9,"ਦਸ":10}
     tokens = list(alias_map.keys())
     found = []
     # Longest known alias first; each matched phrase is consumed once.
     for alias in sorted(tokens, key=len, reverse=True):
         if alias and alias in text:
             before = text[:text.index(alias)]
-            qty_match = _re.search(r"([0-9]+(?:\.[0-9]+)?|एक|दो|तीन|चार|पांच|पाँच|छह|सात|आठ|नौ|दस|one|two|three|four|five|six|seven|eight|nine|ten|ek|do|teen|char|paanch|che|chhe|saat|aath|nau|das)(?:\s*(?:kg|kilo|kilos|gram|grams|g|litre|liter|ltr|packet|packets|pcs|piece|pieces))?\s*$", before)
+            qty_match = _re.search(r"([0-9]+(?:\.[0-9]+)?|एक|दो|तीन|चार|पांच|पाँच|छह|सात|आठ|नौ|दस|one|two|three|four|five|six|seven|eight|nine|ten|ek|ikk|ik|do|teen|tin|tinn|char|paanch|panj|che|chhe|saat|sat|aath|ath|nau|das|ਇੱਕ|ਇਕ|ਦੋ|ਤਿੰਨ|ਚਾਰ|ਪੰਜ|ਛੇ|ਸੱਤ|ਅੱਠ|ਨੌਂ|ਦਸ)(?:\s*(?:kg|kilo|kilos|gram|grams|g|litre|liter|ltr|packet|packets|pcs|piece|pieces))?\s*$", before)
             qty = Decimal(qty_match.group(1)) if qty_match and re.match(r"^[0-9]",qty_match.group(1)) else Decimal(number_words.get(qty_match.group(1),1)) if qty_match else Decimal("1")
             product = alias_map[alias]
             if not any(x["product_id"] == product.id for x in found):
