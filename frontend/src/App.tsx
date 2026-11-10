@@ -75,6 +75,7 @@ export default function App() {
   const audioChunks = useRef<Blob[]>([]);
   const [voiceResult, setVoiceResult] = useState<{
     transcript: string;
+    unmatched_text?: string;
     items: {
       product_id: number;
       name: string;
@@ -689,6 +690,8 @@ export default function App() {
           </div>
         </footer>
       </main>
+      {recording && <div className="voice-listening-banner"><span className="voice-live-dot" /> Listening… Speak your items now, then press “Stop recording”. <small>Offline transcription starts after recording stops.</small></div>}
+      {voiceBusy && <div className="voice-listening-banner"><span className="voice-live-dot processing-dot" /> Converting speech to text and matching products…</div>}
       <button
         className={
           "voice-button" +
@@ -844,124 +847,50 @@ export default function App() {
       )}
       {voiceResult && (
         <div className="modal-backdrop">
-          <section className="modal receipt-modal">
+          <section className="modal receipt-modal voice-review-modal">
             <div className="modal-heading">
-              <div>
-                <div className="section-kicker">
-                  VOICE DRAFT · REVIEW REQUIRED
-                </div>
-                <h3>Confirm spoken items</h3>
+              <div><div className="section-kicker">VOICE DRAFT · REVIEW REQUIRED</div><h3>Speech recognised</h3></div>
+              <button className="modal-close" onClick={() => setVoiceResult(null)}><X size={18}/></button>
+            </div>
+            <div className="voice-transcript-label">TRANSCRIBED TEXT</div>
+            <div className="voice-transcript">{voiceResult.transcript || "No speech detected. Try again, speaking clearly near the microphone."}</div>
+            <div className="voice-transcript-label">MATCHED PRODUCTS · CHECK BEFORE ADDING</div>
+            {voiceResult.items.length ? (
+              <div className="receipt-lines">
+                {voiceResult.items.map((item,index) => (
+                  <div key={index}>
+                    <span>{item.name} · {item.quantity} {item.unit}</span>
+                    <b>{money(Number(item.selling_price)*Number(item.quantity))}</b>
+                    <button className="outline-action" onClick={() => {
+                      const p=products.find(x=>x.id===item.product_id);
+                      if(p) setCart(current=>{const found=current.find(line=>line.product.id===p.id);return found?current.map(line=>line.product.id===p.id?{...line,quantity:line.quantity+Number(item.quantity)}:line):[...current,{product:p,quantity:Number(item.quantity)}];});
+                    }}>Add</button>
+                  </div>
+                ))}
               </div>
-              <button
-                className="modal-close"
-                onClick={() => setVoiceResult(null)}
-              >
-                <X size={18} />
-              </button>
+            ) : <p className="form-hint">No catalogue item matched this sentence. Add a local-language alias to the product or try saying its catalogue name.</p>}
+            {voiceResult.unmatched_text && <p className="form-hint">Not matched: {voiceResult.unmatched_text}</p>}
+            <div className="import-actions">
+              <button className="outline-action" onClick={() => setVoiceResult(null)}>Close</button>
+              <button className="save-product" disabled={!voiceResult.items.length} onClick={() => {
+                setCart(current => {
+                  const next=[...current];
+                  for(const item of voiceResult.items){
+                    const product=products.find(p=>p.id===item.product_id);
+                    if(!product) continue;
+                    const found=next.find(line=>line.product.id===product.id);
+                    if(found) found.quantity+=Number(item.quantity);
+                    else next.push({product,quantity:Number(item.quantity)});
+                  }
+                  return next;
+                });
+                setVoiceResult(null);
+              }}>Add matched items to checkout</button>
             </div>
-            <p>{voiceResult.transcript || "No speech detected"}</p>
-            <div className="receipt-lines">
-              {voiceResult.items.map((item, index) => (
-                <div key={index}>
-                  <span>
-                    {item.name} · {item.quantity} {item.unit}
-                  </span>
-                  <b>
-                    {money(Number(item.selling_price) * Number(item.quantity))}
-                  </b>
-                  <button
-                    className="outline-action"
-                    onClick={() => {
-                      const p = products.find((x) => x.id === item.product_id);
-                      if (p) {
-                        setCart((current) => {
-                          const found = current.find(
-                            (line) => line.product.id === p.id,
-                          );
-                          return found
-                            ? current.map((line) =>
-                                line.product.id === p.id
-                                  ? {
-                                      ...line,
-                                      quantity:
-                                        line.quantity + Number(item.quantity),
-                                    }
-                                  : line,
-                              )
-                            : [
-                                ...current,
-                                { product: p, quantity: Number(item.quantity) },
-                              ];
-                        });
-                      }
-                    }}
-                  >
-                    Add
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button
-              className="save-product"
-              onClick={() => setVoiceResult(null)}
-            >
-              Done reviewing
-            </button>
           </section>
         </div>
       )}
-      {productAction && selectedProduct && (
-        <div className="modal-backdrop" onClick={() => !actionBusy && setProductAction(null)}>
-          <form className="modal product-action-modal" onSubmit={async (event) => {
-            event.preventDefault();
-            setActionBusy(true);
-            try {
-              if (productAction === "edit") {
-                const selling = Number(editSellingPrice);
-                const cost = editCostPrice.trim() === "" ? null : Number(editCostPrice);
-                if (!editName.trim() || !Number.isFinite(selling) || selling < 0 || (cost !== null && (!Number.isFinite(cost) || cost < 0))) throw new Error("Enter a valid product name and non-negative prices.");
-                await api.updateProduct(selectedProduct.id, { name: editName.trim(), selling_price: editSellingPrice, cost_price: cost });
-              } else {
-                const delta = Number(stockDelta);
-                if (!Number.isFinite(delta) || delta === 0) throw new Error("Enter a non-zero stock change.");
-                await api.adjustStock(selectedProduct.id, stockDelta, stockNote.trim() || "Manual stock adjustment");
-              }
-              setProductAction(null);
-              setSelectedProduct(null);
-              setInventory(await api.inventory());
-              await refresh();
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Inventory action failed");
-            } finally { setActionBusy(false); }
-          }} onClick={(event) => event.stopPropagation()}>
-            <div className="modal-heading">
-              <div><div className="section-kicker">INVENTORY CONTROL · {productAction === "edit" ? "EDIT PRODUCT" : "ADJUST STOCK"}</div><h3>{selectedProduct.name}</h3></div>
-              <button type="button" className="modal-close" onClick={() => setProductAction(null)} disabled={actionBusy}><X size={18}/></button>
-            </div>
-            {productAction === "edit" ? (
-              <>
-                <label>Product name<input required value={editName} onChange={e => setEditName(e.target.value)} /></label>
-                <div className="form-grid">
-                  <label>Selling price (₹)<input required type="number" min="0" step="0.01" value={editSellingPrice} onChange={e => setEditSellingPrice(e.target.value)} /></label>
-                  <label>Cost / purchase price (₹)<input type="number" min="0" step="0.01" value={editCostPrice} onChange={e => setEditCostPrice(e.target.value)} placeholder="Enter buying cost" /></label>
-                </div>
-                <p className="form-hint">Cost price is used to calculate gross profit in reports.</p>
-              </>
-            ) : (
-              <>
-                <p className="form-hint">Current stock: <b>{selectedProduct.stock_quantity} {selectedProduct.stock_unit}</b>. Use a positive number to add stock and a negative number to remove stock.</p>
-                <label>Quantity change<input required type="number" step="0.001" value={stockDelta} onChange={e => setStockDelta(e.target.value)} placeholder="e.g. 10 or -2" /></label>
-                <label>Reason<input required value={stockNote} onChange={e => setStockNote(e.target.value)} placeholder="Purchase, damaged, correction…" /></label>
-              </>
-            )}
-            <div className="import-actions">
-              <button type="button" className="outline-action" onClick={() => setProductAction(null)} disabled={actionBusy}>Cancel</button>
-              <button className="save-product" type="submit" disabled={actionBusy}>{actionBusy ? "Saving…" : productAction === "edit" ? "Save changes" : "Apply adjustment"}</button>
-            </div>
-          </form>
-        </div>
-      )}
-            {showImport && (
+      {showImport && (
         <div
           className="modal-backdrop"
           onClick={() => {
