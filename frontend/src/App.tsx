@@ -405,11 +405,11 @@ export default function App() {
               </div>
               <div>
                 <span>Tax</span>
-                <b>{money(0)}</b>
+                <b>{money(taxTotal)}</b>
               </div>
               <div className="bill-total">
                 <span>Amount due</span>
-                <strong>{money(subtotal)}</strong>
+                <strong>{money(amountDue)}</strong>
               </div>
             </div>
             <button className="charge-button" disabled={cart.length === 0 || checkoutBusy || health !== "Connected"} onClick={async () => { setCheckoutBusy(true); try { const sale = await api.checkout({idempotency_key:crypto.randomUUID(),payment_method:paymentMethod,discount:"0",items:cart.map(line=>({product_id:line.product.id,quantity:line.quantity}))}); setLastSale(sale); setCart([]); await refresh(); } catch(e) { setError(e instanceof Error ? e.message : "Checkout failed"); } finally { setCheckoutBusy(false); } }}>

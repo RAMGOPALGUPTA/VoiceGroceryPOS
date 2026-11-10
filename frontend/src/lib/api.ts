@@ -1,6 +1,6 @@
 export const API_BASE = 'http://127.0.0.1:8000/api/v1';
 
-export type Product = { id: number; sku: string; name: string; brand?: string | null; selling_price: string | number; stock_quantity: string | number; stock_unit: string; sale_unit: string; reorder_level?: string | number; is_active: boolean };
+export type Product = { id: number; sku: string; name: string; brand?: string | null; selling_price: string | number; stock_quantity: string | number; stock_unit: string; sale_unit: string; reorder_level?: string | number; tax_rate?: string | number | null; is_active: boolean };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...init?.headers } });
