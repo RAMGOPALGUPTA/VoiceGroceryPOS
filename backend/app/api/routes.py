@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models import Category, Product, ProductAlias, StockMovement, Sale, SaleItem, Payment
 from app.schemas.category import CategoryCreate, CategoryRead
-from app.schemas.sale import CheckoutRequest, SaleRead\nfrom app.schemas.product import (
+from app.schemas.sale import CheckoutRequest, SaleRead
+from app.schemas.product import (
     ProductAliasCreate, ProductAliasRead, ProductCreate, ProductRead,
     ProductUpdate, StockAdjustment, StockMovementRead,
 )
