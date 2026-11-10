@@ -1,14 +1,14 @@
 import re
 import unicodedata
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.database.session import get_db
-from app.models import Category, Product, ProductAlias, StockMovement
+from app.models import Category, Product, ProductAlias, StockMovement, Sale, SaleItem, Payment
 from app.schemas.category import CategoryCreate, CategoryRead
-from app.schemas.product import (
+from app.schemas.sale import CheckoutRequest, SaleRead\nfrom app.schemas.product import (
     ProductAliasCreate, ProductAliasRead, ProductCreate, ProductRead,
     ProductUpdate, StockAdjustment, StockMovementRead,
 )
@@ -314,3 +314,115 @@ def inventory_import_commit(import_id: str, stock_mode: str = Query(default="rep
         db.rollback()
         raise HTTPException(status_code=409, detail="Import conflicts with existing data; no rows were committed") from exc
     return {"import_id": import_id, "status": "committed", "processed_rows": len(rows), "stock_mode": stock_mode}
+
+
+# Transactional checkout and operational read APIs.
+_MONEY = Decimal("0.01")
+def _money(value: Decimal) -> Decimal:
+    return value.quantize(_MONEY, rounding=ROUND_HALF_UP)
+
+@router.post("/sales/checkout", response_model=SaleRead, status_code=status.HTTP_201_CREATED)
+def checkout(payload: CheckoutRequest, db: Session = Depends(get_db)):
+    prior = db.scalar(select(Sale).where(Sale.idempotency_key == payload.idempotency_key))
+    if prior is not None:
+        return prior
+    # Combine repeated product lines before validating stock and calculating totals.
+    quantities: dict[int, Decimal] = {}
+    for line in payload.items:
+        quantities[line.product_id] = quantities.get(line.product_id, Decimal("0")) + line.quantity
+    products = {}
+    subtotal = Decimal("0")
+    calculated = []
+    try:
+        for product_id, quantity in quantities.items():
+            product = db.scalar(select(Product).where(Product.id == product_id).with_for_update())
+            if product is None or not product.is_active:
+                raise HTTPException(status_code=409, detail=f"Product {product_id} is unavailable")
+            stock_delta = quantity * Decimal(product.conversion_to_stock_unit)
+            if Decimal(product.stock_quantity) < stock_delta:
+                raise HTTPException(status_code=409, detail=f"Insufficient stock for {product.name}")
+            line_subtotal = _money(Decimal(product.selling_price) * quantity)
+            subtotal += line_subtotal
+            products[product_id] = product
+            calculated.append((product, quantity, stock_delta, line_subtotal))
+        subtotal = _money(subtotal)
+        if payload.discount > subtotal:
+            raise HTTPException(status_code=422, detail="Discount cannot exceed subtotal")
+        # Allocate the discount proportionally to line bases, then calculate tax.
+        remaining_discount = payload.discount
+        tax_total = Decimal("0")
+        sale = Sale(
+            receipt_number=f"SV-{_datetime.utcnow():%Y%m%d}-{_uuid.uuid4().hex[:8].upper()}",
+            idempotency_key=payload.idempotency_key,
+            status="completed", subtotal=subtotal, discount_total=payload.discount,
+            grand_total=Decimal("0"), tax_total=Decimal("0"), payment_method=payload.payment_method)
+        db.add(sale); db.flush()
+        for index, (product, quantity, stock_delta, line_subtotal) in enumerate(calculated):
+            if index == len(calculated)-1:
+                line_discount = remaining_discount
+            elif subtotal:
+                line_discount = _money(payload.discount * line_subtotal / subtotal)
+                remaining_discount -= line_discount
+            else:
+                line_discount = Decimal("0")
+            taxable = max(Decimal("0"), line_subtotal - line_discount)
+            rate = Decimal(product.tax_rate or 0)
+            line_tax = _money(taxable * rate / Decimal("100"))
+            line_total = taxable + line_tax
+            tax_total += line_tax
+            db.add(SaleItem(sale_id=sale.id, product_id=product.id, sku_snapshot=product.sku,
+                name_snapshot=product.name, unit_snapshot=product.sale_unit, quantity=quantity,
+                unit_price=product.selling_price, tax_rate=rate, line_subtotal=taxable,
+                line_tax=line_tax, line_total=line_total))
+            product.stock_quantity = Decimal(product.stock_quantity) - stock_delta
+            db.add(StockMovement(product_id=product.id, quantity_delta=-stock_delta,
+                stock_unit=product.stock_unit, movement_type="sale", reference_type="sale",
+                reference_id=str(sale.id), note=f"Sold on receipt {sale.receipt_number}"))
+        sale.tax_total = _money(tax_total)
+        sale.grand_total = _money(subtotal - payload.discount + sale.tax_total)
+        db.add(Payment(sale_id=sale.id, method=payload.payment_method, amount=sale.grand_total))
+        db.commit()
+        return db.scalar(select(Sale).where(Sale.id == sale.id))
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as exc:
+        db.rollback()
+        prior = db.scalar(select(Sale).where(Sale.idempotency_key == payload.idempotency_key))
+        if prior is not None:
+            return prior
+        raise HTTPException(status_code=409, detail="Checkout conflicted with another transaction; retry safely") from exc
+    except Exception:
+        db.rollback()
+        raise
+
+@router.get("/sales", response_model=list[SaleRead])
+def list_sales(limit: int = Query(default=100, ge=1, le=500), db: Session = Depends(get_db)):
+    return db.scalars(select(Sale).order_by(Sale.created_at.desc()).limit(limit)).unique().all()
+
+@router.get("/sales/{sale_id}", response_model=SaleRead)
+def get_sale(sale_id: int, db: Session = Depends(get_db)):
+    sale = db.scalar(select(Sale).where(Sale.id == sale_id))
+    if sale is None:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    return sale
+
+@router.get("/inventory/summary")
+def inventory_summary(db: Session = Depends(get_db)):
+    products = db.scalars(select(Product).where(Product.is_active.is_(True)).order_by(Product.name)).all()
+    return {"product_count": len(products), "low_stock_count": sum(1 for p in products if Decimal(p.stock_quantity) <= Decimal(p.reorder_level)), "products": products}
+
+@router.get("/reports/summary")
+def reports_summary(db: Session = Depends(get_db)):
+    today = _datetime.utcnow().date()
+    sales = db.scalars(select(Sale).where(Sale.status == "completed").order_by(Sale.created_at.desc())).all()
+    today_sales = [s for s in sales if s.created_at.date() == today]
+    products = db.scalars(select(Product).where(Product.is_active.is_(True))).all()
+    return {
+        "today_sales_count": len(today_sales),
+        "today_revenue": str(_money(sum((Decimal(s.grand_total) for s in today_sales), Decimal("0")))),
+        "all_time_sales_count": len(sales),
+        "all_time_revenue": str(_money(sum((Decimal(s.grand_total) for s in sales), Decimal("0")))),
+        "low_stock_count": sum(1 for p in products if Decimal(p.stock_quantity) <= Decimal(p.reorder_level)),
+        "inventory_units": str(sum((Decimal(p.stock_quantity) for p in products), Decimal("0"))),
+    }
