@@ -22,3 +22,12 @@ One Windows PC, one counter, 10–15 illustrative products. Operator reviews pro
 ## Later scope
 
 Barcode scanner, purchase receiving, supplier/customer ledger, verified GST configuration, native Gurmukhi/Devanagari receipt rendering, multiple counters/stores, synchronization, analytics and reorder suggestions.
+
+
+## Implementation update — 2026-11-10
+
+- Initial Electron + React POS workspace committed.
+- Product catalogue create/read/update/deactivate and search endpoints committed.
+- Category creation/listing and product aliases committed.
+- Stock adjustments write a stock movement and reject negative resulting stock.
+- Backend and frontend have not yet been run on the target Windows machine; do not treat these features as hardware-verified.
