@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from app.api.routes import router
 from app.core.config import settings
-from app.database.session import engine\nfrom app.database.base import Base
+from app.database.session import engine
+from app.database.base import Base
 
 app = FastAPI(title=settings.app_name, version='0.1.0', description='Offline grocery POS backend')
 # The Electron renderer runs on a different local origin in development and
